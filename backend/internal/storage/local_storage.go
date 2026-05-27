@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -23,7 +22,7 @@ func NewLocalStorage(uploadDir string) *LocalStorage {
 
 func (s *LocalStorage) SaveImage(file *multipart.FileHeader) (string, error) {
 	if file == nil {
-		return "", errors.New("file is nil")
+		return "", fmt.Errorf("file is nil")
 	}
 
 	ext := strings.ToLower(filepath.Ext(file.Filename))
@@ -31,7 +30,9 @@ func (s *LocalStorage) SaveImage(file *multipart.FileHeader) (string, error) {
 		return "", fmt.Errorf("unsupported file type: %s", ext)
 	}
 
-	dateDir := time.Now().Format("2006-01-02")
+	//go可以根据你的模版来判断格式
+	dateDir := time.Now().Format("2006/01/02")
+	//如果中间目录不存在也会一起创建，0755:读写、执行权限
 	saveDir := filepath.Join(s.UploadDir, dateDir)
 
 	if err := os.MkdirAll(saveDir, 0755); err != nil {
@@ -57,5 +58,8 @@ func (s *LocalStorage) SaveImage(file *multipart.FileHeader) (string, error) {
 		return "", err
 	}
 
-	return savePath, nil
+	//前端可访问的URL，不是本地文件路径
+	publicURL := "/uploads/" + dateDir + "/" + filename
+
+	return publicURL, nil
 }

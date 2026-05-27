@@ -30,7 +30,10 @@ func InitSQLite(dsn string) (*gorm.DB, error) {
 		return nil, err
 	}
 
-	if err := db.AutoMigrate(&model.MemoryItem{}); err != nil {
+	if err := db.AutoMigrate(
+		&model.MemoryItem{},
+		&model.Task{},
+	); err != nil {
 		return nil, err
 	}
 
