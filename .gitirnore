@@ -1,0 +1,102 @@
+# =========================
+# OS / Editor
+# =========================
+.DS_Store
+Thumbs.db
+
+.idea/
+.vscode/
+*.iml
+
+# =========================
+# Go
+# =========================
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.prof
+
+# Go workspace
+go.work
+go.work.sum
+
+# Binary output
+/bin/
+/build/
+/dist/
+
+# =========================
+# Backend runtime files
+# =========================
+backend/tmp/
+backend/logs/
+backend/*.log
+
+# Real config files
+backend/configs/config.yaml
+backend/.env
+
+# Keep example configs
+!backend/configs/config.example.yaml
+!backend/.env.example
+
+# =========================
+# Frontend
+# =========================
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# =========================
+# MemoryFlow local user data
+# Very important: do NOT commit private memories
+# =========================
+memoryflow-data/data/*
+memoryflow-data/uploads/*
+memoryflow-data/vector/*
+memoryflow-data/logs/*
+
+# Keep empty directories
+!memoryflow-data/data/.gitkeep
+!memoryflow-data/uploads/.gitkeep
+!memoryflow-data/vector/.gitkeep
+!memoryflow-data/logs/.gitkeep
+
+# SQLite database files
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# =========================
+# Docker / Deploy local files
+# =========================
+deploy/.env
+deploy/config.yaml
+
+# Keep examples
+!deploy/.env.example
+!deploy/config.example.yaml
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+
+# =========================
+# AI / local secrets
+# =========================
+.env
+.env.local
+config.yaml
+*.key
+*.pem

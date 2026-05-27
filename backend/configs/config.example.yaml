@@ -1,0 +1,9 @@
+server:
+  port: 8080
+
+database:
+  driver: sqlite
+  dsn: ../memoryflow-data/data/memoryflow.db
+
+storage:
+  upload_dir: ../memoryflow-data/uploads
