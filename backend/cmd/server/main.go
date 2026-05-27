@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"memoryflow/internal/ai/aimodel"
+	"memoryflow/internal/ai/workflow/text_analyze"
 	"memoryflow/internal/api"
 	"memoryflow/internal/config"
 	"memoryflow/internal/repository"
@@ -33,7 +35,19 @@ func main() {
 	taskService := service.NewTaskService(taskRepo)
 
 	//初始化worker
-	worker := task.NewWorker(taskService, memoryService)
+	chatModel := aimodel.NewChatModel(
+		cfg.Model.BaseURL,
+		cfg.Model.APIKey,
+		cfg.Model.ModelName,
+	)
+
+	textAnalyzeWorkflow := text_analyze.NewWorkflow(chatModel)
+
+	worker := task.NewWorker(
+		taskService,
+		memoryService,
+		textAnalyzeWorkflow,
+	)
 	go worker.Start(context.Background())
 
 	//初始化storage

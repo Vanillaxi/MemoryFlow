@@ -3,7 +3,9 @@ package task
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
+	"memoryflow/internal/ai/workflow/text_analyze"
 	"memoryflow/internal/model"
 	"memoryflow/internal/service"
 	"strings"
@@ -11,16 +13,18 @@ import (
 )
 
 type Worker struct {
-	taskService   *service.TaskService
-	memoryService *service.MemoryService
-	interval      time.Duration
+	taskService         *service.TaskService
+	memoryService       *service.MemoryService
+	textAnalyzeWorkflow *text_analyze.Workflow
+	interval            time.Duration
 }
 
-func NewWorker(taskService *service.TaskService, memoryService *service.MemoryService) *Worker {
+func NewWorker(taskService *service.TaskService, memoryService *service.MemoryService, textAnalyzeWorkflow *text_analyze.Workflow) *Worker {
 	return &Worker{
-		taskService:   taskService,
-		memoryService: memoryService,
-		interval:      2 * time.Second,
+		taskService:         taskService,
+		memoryService:       memoryService,
+		textAnalyzeWorkflow: textAnalyzeWorkflow,
+		interval:            2 * time.Second,
 	}
 }
 
@@ -69,7 +73,7 @@ func (w *Worker) handleTask(ctx context.Context, t model.Task) {
 	case service.TaskTypeImageAnalyze:
 		err = w.handleImageAnalyze(ctx, t)
 	default:
-		err = w.taskService.UpdateStatus(ctx, t.ID, service.TaskStatusRunning, "unknown task type")
+		err = errors.New("unknown task type")
 		return
 	}
 
@@ -91,13 +95,31 @@ func (w *Worker) handleTextAnalyze(ctx context.Context, t model.Task) error {
 		return err
 	}
 
-	summary := buildFakeSummary(item.ContentText)
-	tagsBytes, _ := json.Marshal([]string{"生活记录"})
-	tags := string(tagsBytes)
-	mood := "neutral"
-	importanceSource := 0.5
+	result, err := w.textAnalyzeWorkflow.Run(ctx, text_analyze.TextAnalyzeInput{
+		MemoryID:    item.ID,
+		ContentText: item.ContentText,
+		Location:    item.Location,
+		CreatedAt:   item.CreatedAt,
+	})
+	if err != nil {
+		//task failed
+		return err
+	}
 
-	return w.memoryService.UpdateAnalysis(ctx, item.ID, summary, tags, mood, importanceSource)
+	//数据库 tags 字段如果是 string，就需要 json.Marshal 成字符串
+	tagsBytes, err := json.Marshal(result.Tags)
+	if err != nil {
+		return err
+	}
+
+	return w.memoryService.UpdateAnalysis(
+		ctx,
+		item.ID,
+		result.Summary,
+		string(tagsBytes),
+		result.Mood,
+		result.ImportanceScore,
+	)
 }
 
 func (w *Worker) handleImageAnalyze(ctx context.Context, t model.Task) error {
@@ -114,9 +136,9 @@ func (w *Worker) handleImageAnalyze(ctx context.Context, t model.Task) error {
 	tagsBytes, _ := json.Marshal([]string{"图片", "生活记录"})
 	tags := string(tagsBytes)
 	mood := "neutral"
-	importanceSource := 0.5
+	importanceScore := 0.5
 
-	return w.memoryService.UpdateAnalysis(ctx, item.ID, summary, tags, mood, importanceSource)
+	return w.memoryService.UpdateAnalysis(ctx, item.ID, summary, tags, mood, importanceScore)
 }
 
 func buildFakeSummary(content string) string {

@@ -13,7 +13,7 @@ type MemoryRepository interface {
 	FindByID(ctx context.Context, id uint) (*model.MemoryItem, error)
 	FindRecent(ctx context.Context, limit int) ([]model.MemoryItem, error)
 	FindByTimeRange(ctx context.Context, start, end time.Time, limit int) ([]model.MemoryItem, error)
-	UpdateAnalysis(ctx context.Context, id uint, summary string, tags string, mood string, importanceSource float64) error
+	UpdateAnalysis(ctx context.Context, id uint, summary string, tags string, mood string, importanceScore float64) error
 }
 
 type SQLiteMemoryRepository struct {
@@ -70,14 +70,14 @@ func (r *SQLiteMemoryRepository) FindByID(ctx context.Context, id uint) (*model.
 	return &item, nil
 }
 
-func (r *SQLiteMemoryRepository) UpdateAnalysis(ctx context.Context, id uint, summary string, tags string, mood string, importanceSource float64) error {
+func (r *SQLiteMemoryRepository) UpdateAnalysis(ctx context.Context, id uint, summary string, tags string, mood string, importanceScore float64) error {
 	return r.db.WithContext(ctx).
 		Model(&model.MemoryItem{}).
 		Where("id=? AND deleted_at IS NULL", id).
 		Updates(map[string]any{
-			"summary":           summary,
-			"tags":              tags,
-			"mood":              mood,
-			"importance_source": importanceSource,
+			"summary":          summary,
+			"tags":             tags,
+			"mood":             mood,
+			"importance_score": importanceScore,
 		}).Error
 }

@@ -9,7 +9,8 @@ import (
 type Config struct {
 	Server   ServerConfig   `mapstructure:"server"`
 	Database DatabaseConfig `mapstructure:"database"`
-	Storage  StroageConfig  `mapstructure:"stroage"`
+	Storage  StorageConfig  `mapstructure:"storage"`
+	Model    ModelConfig    `mapstructure:"model"`
 }
 
 type ServerConfig struct {
@@ -21,8 +22,14 @@ type DatabaseConfig struct {
 	DSN    string `mapstructure:"dsn"`
 }
 
-type StroageConfig struct {
+type StorageConfig struct {
 	UploadDir string `mapstructure:"upload_dir"`
+}
+
+type ModelConfig struct {
+	BaseURL   string `mapstructure:"base_url"`
+	APIKey    string `mapstructure:"api_key"`
+	ModelName string `mapstructure:"model_name"`
 }
 
 func LoadConfig(path string) (*Config, error) {
