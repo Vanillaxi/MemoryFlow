@@ -1,8 +1,8 @@
 package api
 
 import (
+	"memoryflow/internal/ai/agent/memory_agent"
 	"memoryflow/internal/ai/retriever"
-	"memoryflow/internal/ai/workflow/rag_answer"
 	"memoryflow/internal/pkg/response"
 	"memoryflow/internal/service"
 	"memoryflow/internal/storage"
@@ -15,20 +15,26 @@ import (
 )
 
 type MemoryHandler struct {
-	memoryService     *service.MemoryService
-	taskService       *service.TaskService
-	storage           *storage.LocalStorage
-	memoryRetriever   *retriever.MemoryRetriever
-	ragAnswerWorkflow *rag_answer.RAGAnswerWorkflow
+	memoryService   *service.MemoryService
+	taskService     *service.TaskService
+	storage         *storage.LocalStorage
+	memoryRetriever *retriever.MemoryRetriever
+	memoryAgent     *memory_agent.MemoryAgent
 }
 
-func NewMemoryHandler(memoryService *service.MemoryService, taskService *service.TaskService, storage *storage.LocalStorage, memoryRetriever *retriever.MemoryRetriever, ragAnswerWorkflow *rag_answer.RAGAnswerWorkflow) *MemoryHandler {
+func NewMemoryHandler(
+	memoryService *service.MemoryService,
+	taskService *service.TaskService,
+	storage *storage.LocalStorage,
+	memoryRetriever *retriever.MemoryRetriever,
+	memoryAgent *memory_agent.MemoryAgent,
+) *MemoryHandler {
 	return &MemoryHandler{
-		memoryService:     memoryService,
-		taskService:       taskService,
-		storage:           storage,
-		memoryRetriever:   memoryRetriever,
-		ragAnswerWorkflow: ragAnswerWorkflow,
+		memoryService:   memoryService,
+		taskService:     taskService,
+		storage:         storage,
+		memoryRetriever: memoryRetriever,
+		memoryAgent:     memoryAgent,
 	}
 }
 
@@ -238,7 +244,49 @@ func (h *MemoryHandler) Ask(c *gin.Context) {
 		return
 	}
 
-	result, err := h.ragAnswerWorkflow.Answer(c.Request.Context(), q)
+	topK := 20
+	topKStr := c.DefaultQuery("top_k", "20")
+	if parsed, err := strconv.Atoi(topKStr); err == nil && parsed > 0 {
+		topK = parsed
+	}
+	if topK > 20 {
+		topK = 20
+	}
+
+	memoryType := strings.TrimSpace(c.Query("type"))
+	if memoryType != "" && memoryType != "text" && memoryType != "image" && memoryType != "mixed" {
+		response.Error(c, http.StatusBadRequest, "invalid type, expected text/image/mixed")
+		return
+	}
+
+	var startTime *time.Time
+	if startStr := strings.TrimSpace(c.Query("start")); startStr != "" {
+		parsed, err := time.Parse("2006-01-02", startStr)
+		if err != nil {
+			response.Error(c, http.StatusBadRequest, "invalid start format, expected YYYY-MM-DD")
+			return
+		}
+		startTime = &parsed
+	}
+
+	var endTime *time.Time
+	if endStr := strings.TrimSpace(c.Query("end")); endStr != "" {
+		parsed, err := time.Parse("2006-01-02", endStr)
+		if err != nil {
+			response.Error(c, http.StatusBadRequest, "invalid end format, expected YYYY-MM-DD")
+			return
+		}
+		parsed = parsed.Add(24*time.Hour - time.Second)
+		endTime = &parsed
+	}
+
+	result, err := h.memoryAgent.Chat(c.Request.Context(), memory_agent.ChatInput{
+		Message:   q,
+		TopK:      topK,
+		Type:      memoryType,
+		StartTime: startTime,
+		EndTime:   endTime,
+	})
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, err.Error())
 		return

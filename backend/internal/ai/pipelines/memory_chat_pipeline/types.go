@@ -1,4 +1,4 @@
-package rag_answer_eino
+package memory_chat_pipeline
 
 import (
 	"time"
@@ -6,7 +6,7 @@ import (
 	"memoryflow/internal/ai/retriever"
 )
 
-type RAGAnswerInput struct {
+type ChatInput struct {
 	Question  string
 	TopK      int
 	Type      string
@@ -14,7 +14,7 @@ type RAGAnswerInput struct {
 	EndTime   *time.Time
 }
 
-type RAGAnswerOutput struct {
+type ChatOutput struct {
 	Answer     string            `json:"answer"`
 	References []MemoryReference `json:"references"`
 }
@@ -30,8 +30,8 @@ type MemoryReference struct {
 	Score      float32 `json:"score"`
 }
 
-type RAGState struct {
-	Input         RAGAnswerInput
+type ChatState struct {
+	Input         ChatInput
 	Retrieved     []retriever.RetrievedMemory
 	Reranked      []retriever.RetrievedMemory
 	MemoryContext string
