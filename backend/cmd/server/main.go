@@ -9,6 +9,7 @@ import (
 	"memoryflow/internal/ai/reranker"
 	"memoryflow/internal/ai/retriever"
 	"memoryflow/internal/ai/vectorstore"
+	"memoryflow/internal/ai/workflow/image_analyze"
 	"memoryflow/internal/ai/workflow/rag_answer"
 	"memoryflow/internal/ai/workflow/text_analyze"
 	"memoryflow/internal/api"
@@ -48,6 +49,7 @@ func main() {
 		cfg.Model.ModelName,
 	)
 	textAnalyzeWorkflow := text_analyze.NewWorkflow(chatModel)
+	imageAnalyzeWorkflow := image_analyze.NewWorkflow()
 
 	//初始化MilvusStore
 	milvusStore, err := vectorstore.NewMilvusStore(
@@ -76,7 +78,7 @@ func main() {
 		cfg.Embedding.Dim,
 	)
 
-	memoryRetriever := retriever.NewMemoryRettriever(
+	memoryRetriever := retriever.NewMemoryRetriever(
 		embeddingClient,
 		milvusStore,
 		memoryService,
@@ -95,6 +97,7 @@ func main() {
 		taskService,
 		memoryService,
 		textAnalyzeWorkflow,
+		imageAnalyzeWorkflow,
 		embeddingClient,
 		milvusStore,
 	)

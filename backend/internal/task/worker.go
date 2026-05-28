@@ -7,6 +7,7 @@ import (
 	"log"
 	"memoryflow/internal/ai/embedding"
 	"memoryflow/internal/ai/vectorstore"
+	"memoryflow/internal/ai/workflow/image_analyze"
 	"memoryflow/internal/ai/workflow/text_analyze"
 	"memoryflow/internal/model"
 	"memoryflow/internal/service"
@@ -15,22 +16,31 @@ import (
 )
 
 type Worker struct {
-	taskService         *service.TaskService
-	memoryService       *service.MemoryService
-	textAnalyzeWorkflow *text_analyze.Workflow
-	embeddingClient     *embedding.Client
-	milvusStore         *vectorstore.MilvusStore
-	interval            time.Duration
+	taskService          *service.TaskService
+	memoryService        *service.MemoryService
+	textAnalyzeWorkflow  *text_analyze.Workflow
+	imageAnalyzeWorkflow *image_analyze.Workflow
+	embeddingClient      *embedding.Client
+	milvusStore          *vectorstore.MilvusStore
+	interval             time.Duration
 }
 
-func NewWorker(taskService *service.TaskService, memoryService *service.MemoryService, textAnalyzeWorkflow *text_analyze.Workflow, embeddingClient *embedding.Client, milvusStore *vectorstore.MilvusStore) *Worker {
+func NewWorker(
+	taskService *service.TaskService,
+	memoryService *service.MemoryService,
+	textAnalyzeWorkflow *text_analyze.Workflow,
+	imageAnalyzeWorkflow *image_analyze.Workflow,
+	embeddingClient *embedding.Client,
+	milvusStore *vectorstore.MilvusStore,
+) *Worker {
 	return &Worker{
-		taskService:         taskService,
-		memoryService:       memoryService,
-		textAnalyzeWorkflow: textAnalyzeWorkflow,
-		embeddingClient:     embeddingClient,
-		milvusStore:         milvusStore,
-		interval:            2 * time.Second,
+		taskService:          taskService,
+		memoryService:        memoryService,
+		textAnalyzeWorkflow:  textAnalyzeWorkflow,
+		imageAnalyzeWorkflow: imageAnalyzeWorkflow,
+		embeddingClient:      embeddingClient,
+		milvusStore:          milvusStore,
+		interval:             2 * time.Second,
 	}
 }
 
@@ -146,17 +156,30 @@ func (w *Worker) handleImageAnalyze(ctx context.Context, t model.Task) error {
 		return err
 	}
 
-	summary := "这是一条图片记忆，后续会由多模态模型生成图片描述。"
-	if strings.TrimSpace(item.ContentText) != "" {
-		summary = "这是一条带有文字说明的图片记忆：" + item.ContentText
+	result, err := w.imageAnalyzeWorkflow.Run(image_analyze.ImageAnalyzeInput{
+		MemoryID:    item.ID,
+		ImageURL:    item.ImageURL,
+		ContentText: item.ContentText,
+		Location:    item.Location,
+		CreatedAt:   item.CreatedAt,
+	})
+	if err != nil {
+		return err
 	}
 
-	tagsBytes, _ := json.Marshal([]string{"图片", "生活记录"})
-	tags := string(tagsBytes)
-	mood := "neutral"
-	importanceScore := 0.5
+	tagsBytes, err := json.Marshal(result.Tags)
+	if err != nil {
+		return err
+	}
 
-	if err := w.memoryService.UpdateAnalysis(ctx, item.ID, summary, tags, mood, importanceScore); err != nil {
+	if err := w.memoryService.UpdateAnalysis(
+		ctx,
+		item.ID,
+		result.Summary,
+		string(tagsBytes),
+		result.Mood,
+		result.ImportanceScore,
+	); err != nil {
 		return err
 	}
 
@@ -165,9 +188,10 @@ func (w *Worker) handleImageAnalyze(ctx context.Context, t model.Task) error {
 		return err
 	}
 
-	log.Printf("[task-worker] created embedding task for image memory,memory_id=%d\n", item.ID)
+	log.Printf("[task-worker] created embedding task for image memory, memory_id=%d\n", item.ID)
 	return nil
 }
+
 func (w *Worker) handleEmbedding(ctx context.Context, t model.Task) error {
 	log.Printf("[task-worker] start embedding, task_id=%d, memory_id=%d\n", t.ID, t.TargetID)
 
@@ -181,6 +205,12 @@ func (w *Worker) handleEmbedding(ctx context.Context, t model.Task) error {
 	vec, err := w.embeddingClient.Embed(ctx, embeddingText)
 	if err != nil {
 		return err
+	}
+
+	memoryID := int64(item.ID)
+
+	if err := w.milvusStore.DeleteMemoryVector(ctx, memoryID); err != nil {
+		log.Printf("[task-worker] delete old memory vector skipped, memory_id=%d, err=%v\n", item.ID, err)
 	}
 
 	if err := w.milvusStore.InsertMemoryVector(ctx, vectorstore.MemoryVector{
@@ -207,6 +237,12 @@ func buildEmbeddingText(item *model.MemoryItem) string {
 	if strings.TrimSpace(item.ContentText) != "" {
 		b.WriteString("内容：")
 		b.WriteString(item.ContentText)
+		b.WriteString("\n")
+	}
+
+	if strings.TrimSpace(item.ImageURL) != "" {
+		b.WriteString("图片地址：")
+		b.WriteString(item.ImageURL)
 		b.WriteString("\n")
 	}
 

@@ -35,6 +35,13 @@ type MemoryVector struct {
 	Vector     []float32
 }
 
+type SearchOptions struct {
+	TopK      int
+	Type      string
+	StartUnix *int64
+	EndUnix   *int64
+}
+
 type SearchResult struct {
 	MemoryID int64
 	Score    float32
@@ -194,25 +201,30 @@ func (s *MilvusStore) InsertMemoryVector(ctx context.Context, item MemoryVector)
 	return nil
 }
 
-func (s *MilvusStore) SearchMemoryVector(ctx context.Context, vector []float32, topK int) ([]SearchResult, error) {
+func (s *MilvusStore) SearchMemoryVector(ctx context.Context, vector []float32, opt SearchOptions) ([]SearchResult, error) {
 	if len(vector) != s.dim {
 		return nil, fmt.Errorf("query vector dim mismatch: got=%d, want=%d", len(vector), s.dim)
 	}
+	topK := opt.TopK
 	if topK <= 0 {
 		topK = 5
 	}
 
-	resultSets, err := s.client.Search(
-		ctx,
-		milvusclient.NewSearchOption(
-			s.collection,
-			topK,
-			[]entity.Vector{entity.FloatVector(vector)},
-		).
-			WithANNSField(FieldVector).
-			WithOutputFields(FieldMemoryID).
-			WithConsistencyLevel(entity.ClBounded),
-	)
+	searchOption := milvusclient.NewSearchOption(
+		s.collection,
+		topK,
+		[]entity.Vector{entity.FloatVector(vector)},
+	).
+		WithANNSField(FieldVector).
+		WithOutputFields(FieldMemoryID).
+		WithConsistencyLevel(entity.ClBounded)
+
+	expr := buildSearchExpr(opt)
+	if expr != "" {
+		searchOption = searchOption.WithFilter(expr)
+	}
+
+	resultSets, err := s.client.Search(ctx, searchOption)
 	if err != nil {
 		return nil, fmt.Errorf("search memory vector failed: %w", err)
 	}
@@ -234,4 +246,40 @@ func (s *MilvusStore) SearchMemoryVector(ctx context.Context, vector []float32, 
 		}
 	}
 	return results, nil
+}
+
+func (s *MilvusStore) DeleteMemoryVector(ctx context.Context, memoryID int64) error {
+	if memoryID <= 0 {
+		return errors.New("memory_id must be positive")
+	}
+
+	result, err := s.client.Delete(
+		ctx,
+		milvusclient.NewDeleteOption(s.collection).
+			WithInt64IDs(FieldMemoryID, []int64{memoryID}),
+	)
+	if err != nil {
+		return fmt.Errorf("delete memory vector failed: %w", err)
+	}
+
+	log.Printf("[milvus] delete memory vector successfully, memory_id=%d, delete_count=%d\n", memoryID, result.DeleteCount)
+	return nil
+}
+
+func buildSearchExpr(opt SearchOptions) string {
+	conds := make([]string, 0)
+
+	if strings.TrimSpace(opt.Type) != "" {
+		conds = append(conds, fmt.Sprintf("%s == \"%s\"", FieldMemoryType, opt.Type))
+	}
+
+	if opt.StartUnix != nil {
+		conds = append(conds, fmt.Sprintf("%s >= %d", FieldOccurredAt, *opt.StartUnix))
+	}
+
+	if opt.EndUnix != nil {
+		conds = append(conds, fmt.Sprintf("%s <= %d", FieldOccurredAt, *opt.EndUnix))
+	}
+
+	return strings.Join(conds, " and ")
 }

@@ -22,6 +22,7 @@ type MemoryReference struct {
 	ID         uint    `json:"id"`
 	Summary    string  `json:"summary"`
 	Content    string  `json:"content,omitempty"`
+	ImageURL   string  `json:"image_url,omitempty"`
 	OccurredAt string  `json:"occurred_at,omitempty"`
 	Location   string  `json:"location,omitempty"`
 	Mood       string  `json:"mood,omitempty"`
@@ -104,6 +105,7 @@ func buildReferences(memories []retriever.RetrievedMemory) []MemoryReference {
 			ID:       memory.ID,
 			Summary:  memory.Summary,
 			Content:  content,
+			ImageURL: memory.ImageURL,
 			Location: memory.Location,
 			Mood:     memory.Mood,
 			Score:    item.Score,
