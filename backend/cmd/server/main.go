@@ -6,8 +6,10 @@ import (
 	"log"
 	"memoryflow/internal/ai/aimodel"
 	"memoryflow/internal/ai/embedding"
+	"memoryflow/internal/ai/reranker"
 	"memoryflow/internal/ai/retriever"
 	"memoryflow/internal/ai/vectorstore"
+	"memoryflow/internal/ai/workflow/rag_answer"
 	"memoryflow/internal/ai/workflow/text_analyze"
 	"memoryflow/internal/api"
 	"memoryflow/internal/config"
@@ -80,6 +82,14 @@ func main() {
 		memoryService,
 	)
 
+	memoryReranker := reranker.NewMemoryReranker()
+
+	ragAnswerWorkflow := rag_answer.NewRAGAnswerWorkflow(
+		memoryRetriever,
+		memoryReranker,
+		chatModel,
+	)
+
 	//初始化worker
 	worker := task.NewWorker(
 		taskService,
@@ -94,7 +104,7 @@ func main() {
 	localStorage := storage.NewLocalStorage(cfg.Storage.UploadDir)
 
 	//初始化Handler
-	memoryHandler := api.NewMemoryHandler(memoryService, taskService, localStorage, memoryRetriever)
+	memoryHandler := api.NewMemoryHandler(memoryService, taskService, localStorage, memoryRetriever, ragAnswerWorkflow)
 	taskHandler := api.NewTaskHandler(taskService)
 
 	//初始化router

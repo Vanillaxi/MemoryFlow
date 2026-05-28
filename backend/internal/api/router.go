@@ -22,5 +22,7 @@ func RegisterRoutes(r *gin.Engine, memoryHandler *MemoryHandler, taskHandler *Ta
 		api.GET("/timeline", memoryHandler.GetTimeline)
 
 		api.GET("/tasks/:id", taskHandler.GetTask)
+
+		api.GET("/memories/ask", memoryHandler.Ask)
 	}
 }

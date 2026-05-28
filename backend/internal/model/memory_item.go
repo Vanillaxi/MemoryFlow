@@ -6,7 +6,7 @@ type MemoryItem struct {
 	ID              uint       `gorm:"primaryKey" json:"id"`
 	Type            string     `gorm:"not null;index" json:"type"` // text/image/mixed
 	ContentText     string     `json:"content_text"`
-	ImageURL        string     `json:"image_URL"`
+	ImageURL        string     `json:"image_url"`
 	OccurredAt      time.Time  `gorm:"index" json:"occurred_at"`
 	Location        string     `json:"location"`
 	Summary         string     `json:"summary"`

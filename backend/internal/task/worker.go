@@ -156,9 +156,18 @@ func (w *Worker) handleImageAnalyze(ctx context.Context, t model.Task) error {
 	mood := "neutral"
 	importanceScore := 0.5
 
-	return w.memoryService.UpdateAnalysis(ctx, item.ID, summary, tags, mood, importanceScore)
-}
+	if err := w.memoryService.UpdateAnalysis(ctx, item.ID, summary, tags, mood, importanceScore); err != nil {
+		return err
+	}
 
+	_, err = w.taskService.CreateTask(ctx, service.TaskTypeEmbedding, item.ID)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("[task-worker] created embedding task for image memory,memory_id=%d\n", item.ID)
+	return nil
+}
 func (w *Worker) handleEmbedding(ctx context.Context, t model.Task) error {
 	log.Printf("[task-worker] start embedding, task_id=%d, memory_id=%d\n", t.ID, t.TargetID)
 

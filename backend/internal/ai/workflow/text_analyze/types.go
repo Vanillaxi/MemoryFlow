@@ -15,5 +15,5 @@ type AIAnalyzeResult struct {
 	Summary         string   `json:"summary"`
 	Tags            []string `json:"tags"`
 	Mood            string   `json:"mood"`
-	ImportanceScore float64  `json:"importanceScore"`
+	ImportanceScore float64  `json:"importance_score"`
 }

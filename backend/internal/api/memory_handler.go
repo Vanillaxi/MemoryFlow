@@ -2,6 +2,7 @@ package api
 
 import (
 	"memoryflow/internal/ai/retriever"
+	"memoryflow/internal/ai/workflow/rag_answer"
 	"memoryflow/internal/pkg/response"
 	"memoryflow/internal/service"
 	"memoryflow/internal/storage"
@@ -14,18 +15,20 @@ import (
 )
 
 type MemoryHandler struct {
-	memoryService   *service.MemoryService
-	taskService     *service.TaskService
-	storage         *storage.LocalStorage
-	memoryRetriever *retriever.MemoryRetriever
+	memoryService     *service.MemoryService
+	taskService       *service.TaskService
+	storage           *storage.LocalStorage
+	memoryRetriever   *retriever.MemoryRetriever
+	ragAnswerWorkflow *rag_answer.RAGAnswerWorkflow
 }
 
-func NewMemoryHandler(memoryService *service.MemoryService, taskService *service.TaskService, storage *storage.LocalStorage, memoryRetriever *retriever.MemoryRetriever) *MemoryHandler {
+func NewMemoryHandler(memoryService *service.MemoryService, taskService *service.TaskService, storage *storage.LocalStorage, memoryRetriever *retriever.MemoryRetriever, ragAnswerWorkflow *rag_answer.RAGAnswerWorkflow) *MemoryHandler {
 	return &MemoryHandler{
-		memoryService:   memoryService,
-		taskService:     taskService,
-		storage:         storage,
-		memoryRetriever: memoryRetriever,
+		memoryService:     memoryService,
+		taskService:       taskService,
+		storage:           storage,
+		memoryRetriever:   memoryRetriever,
+		ragAnswerWorkflow: ragAnswerWorkflow,
 	}
 }
 
@@ -95,11 +98,13 @@ func (h *MemoryHandler) CreateImageMemory(c *gin.Context) {
 
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
 	}
 
 	task, err := h.taskService.CreateTask(c.Request.Context(), service.TaskTypeImageAnalyze, item.ID)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
 	}
 
 	response.OK(c, gin.H{
@@ -111,7 +116,13 @@ func (h *MemoryHandler) CreateImageMemory(c *gin.Context) {
 
 func (h *MemoryHandler) ListRecent(c *gin.Context) {
 	limitStr := c.DefaultQuery("limit", "20")
-	limit, _ := strconv.Atoi(limitStr)
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
 
 	items, err := h.memoryService.ListRecent(c.Request.Context(), limit)
 	if err != nil {
@@ -130,7 +141,7 @@ func (h *MemoryHandler) GetTimeline(c *gin.Context) {
 		return
 	}
 
-	start, err := time.Parse("2006-01-02 ", startStr)
+	start, err := time.Parse("2006-01-02", startStr)
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, "invalid start format,expected YYYY-MM-DD")
 		return
@@ -182,8 +193,24 @@ func (h *MemoryHandler) SearchMemories(c *gin.Context) {
 
 	response.OK(c, gin.H{
 		"query":  q,
-		"top_K":  topK,
+		"top_k":  topK,
 		"result": results,
 	})
 
+}
+
+func (h *MemoryHandler) Ask(c *gin.Context) {
+	q := strings.TrimSpace(c.Query("q"))
+	if q == "" {
+		response.Error(c, http.StatusBadRequest, "q is required")
+		return
+	}
+
+	result, err := h.ragAnswerWorkflow.Answer(c.Request.Context(), q)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response.OK(c, result)
 }
