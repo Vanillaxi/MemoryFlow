@@ -14,3 +14,13 @@ model:
   base_url: "https://xxx/v1"
   api_key: "你本地的key"
   model_name: "xxx"
+
+embedding:
+  base_url: "https://ark.cn-beijing.volces.com/api/v3"
+  api_key: "xxx"
+  model_name: "你的_embedding_模型名"
+  dim: 1024
+
+milvus:
+  address: "localhost:19530"
+  collection: "memoryflow_memories"

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"memoryflow/internal/ai/embedding"
+	"memoryflow/internal/ai/vectorstore"
 	"memoryflow/internal/ai/workflow/text_analyze"
 	"memoryflow/internal/model"
 	"memoryflow/internal/service"
@@ -16,14 +18,18 @@ type Worker struct {
 	taskService         *service.TaskService
 	memoryService       *service.MemoryService
 	textAnalyzeWorkflow *text_analyze.Workflow
+	embeddingClient     *embedding.Client
+	milvusStore         *vectorstore.MilvusStore
 	interval            time.Duration
 }
 
-func NewWorker(taskService *service.TaskService, memoryService *service.MemoryService, textAnalyzeWorkflow *text_analyze.Workflow) *Worker {
+func NewWorker(taskService *service.TaskService, memoryService *service.MemoryService, textAnalyzeWorkflow *text_analyze.Workflow, embeddingClient *embedding.Client, milvusStore *vectorstore.MilvusStore) *Worker {
 	return &Worker{
 		taskService:         taskService,
 		memoryService:       memoryService,
 		textAnalyzeWorkflow: textAnalyzeWorkflow,
+		embeddingClient:     embeddingClient,
+		milvusStore:         milvusStore,
 		interval:            2 * time.Second,
 	}
 }
@@ -72,6 +78,8 @@ func (w *Worker) handleTask(ctx context.Context, t model.Task) {
 		err = w.handleTextAnalyze(ctx, t)
 	case service.TaskTypeImageAnalyze:
 		err = w.handleImageAnalyze(ctx, t)
+	case service.TaskTypeEmbedding:
+		err = w.handleEmbedding(ctx, t)
 	default:
 		err = errors.New("unknown task type")
 		return
@@ -112,14 +120,24 @@ func (w *Worker) handleTextAnalyze(ctx context.Context, t model.Task) error {
 		return err
 	}
 
-	return w.memoryService.UpdateAnalysis(
+	if err := w.memoryService.UpdateAnalysis(
 		ctx,
 		item.ID,
 		result.Summary,
 		string(tagsBytes),
 		result.Mood,
 		result.ImportanceScore,
-	)
+	); err != nil {
+		return err
+	}
+
+	_, err = w.taskService.CreateTask(ctx, service.TaskTypeEmbedding, item.ID)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("[task-worker] created embedding task,memory_id=%d\n", item.ID)
+	return nil
 }
 
 func (w *Worker) handleImageAnalyze(ctx context.Context, t model.Task) error {
@@ -141,13 +159,82 @@ func (w *Worker) handleImageAnalyze(ctx context.Context, t model.Task) error {
 	return w.memoryService.UpdateAnalysis(ctx, item.ID, summary, tags, mood, importanceScore)
 }
 
-func buildFakeSummary(content string) string {
-	content = strings.TrimSpace(content)
-	if content == "" {
-		return "这是一条生活记录。"
+func (w *Worker) handleEmbedding(ctx context.Context, t model.Task) error {
+	log.Printf("[task-worker] start embedding, task_id=%d, memory_id=%d\n", t.ID, t.TargetID)
+
+	item, err := w.memoryService.GetByID(ctx, t.TargetID)
+	if err != nil {
+		return err
 	}
-	if len([]rune(content)) > 30 {
-		return "这是一条生活记录：" + string([]rune(content)[:30]) + "..."
+
+	embeddingText := buildEmbeddingText(item)
+
+	vec, err := w.embeddingClient.Embed(ctx, embeddingText)
+	if err != nil {
+		return err
 	}
-	return "这是一条生活记录：" + content
+
+	if err := w.milvusStore.InsertMemoryVector(ctx, vectorstore.MemoryVector{
+		MemoryID:   int64(item.ID),
+		Content:    truncateForMilvus(embeddingText, 4000),
+		MemoryType: item.Type,
+		OccurredAt: item.OccurredAt.Unix(),
+		Vector:     vec,
+	}); err != nil {
+		return err
+	}
+
+	log.Printf("[task-worker] embedding inserted to milvus, memory_id=%d\n", item.ID)
+	return nil
+}
+
+func buildEmbeddingText(item *model.MemoryItem) string {
+	var b strings.Builder
+
+	b.WriteString("类型：")
+	b.WriteString(item.Type)
+	b.WriteString("\n")
+
+	if strings.TrimSpace(item.ContentText) != "" {
+		b.WriteString("内容：")
+		b.WriteString(item.ContentText)
+		b.WriteString("\n")
+	}
+
+	if strings.TrimSpace(item.Summary) != "" {
+		b.WriteString("摘要")
+		b.WriteString(item.Summary)
+		b.WriteString("\n")
+	}
+
+	if strings.TrimSpace(item.Tags) != "" {
+		b.WriteString("标签：")
+		b.WriteString(item.Tags)
+		b.WriteString("\n")
+	}
+
+	if strings.TrimSpace(item.Location) != "" {
+		b.WriteString("地点：")
+		b.WriteString(item.Location)
+		b.WriteString("\n")
+	}
+
+	if strings.TrimSpace(item.ContentText) != "" {
+		b.WriteString("情绪：")
+		b.WriteString(item.Mood)
+		b.WriteString("\n")
+	}
+
+	b.WriteString("时间：")
+	b.WriteString(item.OccurredAt.Format("2006-01-02 15:04:05"))
+
+	return b.String()
+}
+
+func truncateForMilvus(s string, maxRunes int) string {
+	runes := []rune(s)
+	if len(runes) <= maxRunes {
+		return s
+	}
+	return string(runes[:maxRunes])
 }

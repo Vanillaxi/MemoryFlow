@@ -7,10 +7,12 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig   `mapstructure:"server"`
-	Database DatabaseConfig `mapstructure:"database"`
-	Storage  StorageConfig  `mapstructure:"storage"`
-	Model    ModelConfig    `mapstructure:"model"`
+	Server    ServerConfig    `mapstructure:"server"`
+	Database  DatabaseConfig  `mapstructure:"database"`
+	Storage   StorageConfig   `mapstructure:"storage"`
+	Model     ModelConfig     `mapstructure:"model"`
+	Embedding EmbeddingConfig `mapstructure:"embedding"`
+	Milvus    MilvusConfig    `mapstructure:"milvus"`
 }
 
 type ServerConfig struct {
@@ -30,6 +32,18 @@ type ModelConfig struct {
 	BaseURL   string `mapstructure:"base_url"`
 	APIKey    string `mapstructure:"api_key"`
 	ModelName string `mapstructure:"model_name"`
+}
+
+type EmbeddingConfig struct {
+	BaseURL   string `mapstructure:"base_url"`
+	APIKey    string `mapstructure:"api_key"`
+	ModelName string `mapstructure:"model_name"`
+	Dim       int    `mapstructure:"dim"`
+}
+
+type MilvusConfig struct {
+	Address    string `mapstructure:"address"`
+	Collection string `mapstructure:"collection"`
 }
 
 func LoadConfig(path string) (*Config, error) {

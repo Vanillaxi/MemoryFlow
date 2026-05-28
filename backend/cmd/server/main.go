@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"memoryflow/internal/ai/aimodel"
+	"memoryflow/internal/ai/embedding"
+	"memoryflow/internal/ai/vectorstore"
 	"memoryflow/internal/ai/workflow/text_analyze"
 	"memoryflow/internal/api"
 	"memoryflow/internal/config"
@@ -17,36 +19,67 @@ import (
 )
 
 func main() {
+	//config
 	cfg, err := config.LoadConfig("configs/config.yaml")
 	if err != nil {
 		log.Fatal("load config failed", err)
 	}
 
+	//初始化sqlite
 	db, err := repository.InitSQLite(cfg.Database.DSN)
 	if err != nil {
 		log.Fatalf("init sqlite failed: %v", err)
 	}
 
-	//初始化Service
+	//初始化repo/Service
 	memoryRepo := repository.NewSQLiteMemoryRepository(db)
 	memoryService := service.NewMemoryService(memoryRepo)
 
 	taskRepo := repository.NewSQLiteTaskRepository(db)
 	taskService := service.NewTaskService(taskRepo)
 
-	//初始化worker
+	//初始化chatmodel+textAnalyzeWorkflow
 	chatModel := aimodel.NewChatModel(
 		cfg.Model.BaseURL,
 		cfg.Model.APIKey,
 		cfg.Model.ModelName,
 	)
-
 	textAnalyzeWorkflow := text_analyze.NewWorkflow(chatModel)
 
+	//初始化MilvusStore
+	milvusStore, err := vectorstore.NewMilvusStore(
+		context.Background(),
+		cfg.Milvus.Address,
+		cfg.Milvus.Collection,
+		cfg.Embedding.Dim,
+	)
+	if err != nil {
+		log.Fatalf("init milvus store failed: %v", err)
+	}
+	if err := milvusStore.EnsureCollection(context.Background()); err != nil {
+		log.Fatalf("ensure collection failed: %v", err)
+	}
+	defer func() {
+		if err := milvusStore.Close(context.Background()); err != nil {
+			log.Printf("close milvus store failed: %v", err)
+		}
+	}()
+
+	//embeddingClient
+	embeddingClient := embedding.NewClient(
+		cfg.Embedding.BaseURL,
+		cfg.Embedding.APIKey,
+		cfg.Embedding.ModelName,
+		cfg.Embedding.Dim,
+	)
+
+	//初始化worker
 	worker := task.NewWorker(
 		taskService,
 		memoryService,
 		textAnalyzeWorkflow,
+		embeddingClient,
+		milvusStore,
 	)
 	go worker.Start(context.Background())
 
@@ -57,6 +90,7 @@ func main() {
 	memoryHandler := api.NewMemoryHandler(memoryService, taskService, localStorage)
 	taskHandler := api.NewTaskHandler(taskService)
 
+	//初始化router
 	r := gin.Default()
 	api.RegisterRoutes(r, memoryHandler, taskHandler, cfg.Storage.UploadDir)
 
