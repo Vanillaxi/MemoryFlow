@@ -1,27 +1,31 @@
 package api
 
 import (
+	"memoryflow/internal/ai/retriever"
 	"memoryflow/internal/pkg/response"
 	"memoryflow/internal/service"
 	"memoryflow/internal/storage"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
 type MemoryHandler struct {
-	memoryService *service.MemoryService
-	taskService   *service.TaskService
-	storage       *storage.LocalStorage
+	memoryService   *service.MemoryService
+	taskService     *service.TaskService
+	storage         *storage.LocalStorage
+	memoryRetriever *retriever.MemoryRetriever
 }
 
-func NewMemoryHandler(memoryService *service.MemoryService, taskService *service.TaskService, storage *storage.LocalStorage) *MemoryHandler {
+func NewMemoryHandler(memoryService *service.MemoryService, taskService *service.TaskService, storage *storage.LocalStorage, memoryRetriever *retriever.MemoryRetriever) *MemoryHandler {
 	return &MemoryHandler{
-		memoryService: memoryService,
-		taskService:   taskService,
-		storage:       storage,
+		memoryService:   memoryService,
+		taskService:     taskService,
+		storage:         storage,
+		memoryRetriever: memoryRetriever,
 	}
 }
 
@@ -145,5 +149,41 @@ func (h *MemoryHandler) GetTimeline(c *gin.Context) {
 	}
 
 	response.OK(c, groups)
+
+}
+
+func (h *MemoryHandler) SearchMemories(c *gin.Context) {
+	q := strings.TrimSpace(c.Query("q"))
+	if q == "" {
+		response.Error(c, http.StatusBadRequest, "query param is required")
+		return
+	}
+
+	topK := 5
+	topKStr := c.DefaultQuery("top_k", "5")
+	if parsed, err := strconv.Atoi(topKStr); err == nil && parsed > 0 {
+		topK = parsed
+	}
+	if topK > 20 {
+		topK = 20
+	}
+
+	results, err := h.memoryRetriever.Retrieve(
+		c.Request.Context(),
+		q,
+		retriever.RetrieveOptions{
+			TopK: topK,
+		},
+	)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response.OK(c, gin.H{
+		"query":  q,
+		"top_K":  topK,
+		"result": results,
+	})
 
 }

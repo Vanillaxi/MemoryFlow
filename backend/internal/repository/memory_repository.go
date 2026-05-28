@@ -11,6 +11,7 @@ import (
 type MemoryRepository interface {
 	Create(ctx context.Context, item *model.MemoryItem) error
 	FindByID(ctx context.Context, id uint) (*model.MemoryItem, error)
+	FindByIDs(ctx context.Context, ids []uint) ([]model.MemoryItem, error)
 	FindRecent(ctx context.Context, limit int) ([]model.MemoryItem, error)
 	FindByTimeRange(ctx context.Context, start, end time.Time, limit int) ([]model.MemoryItem, error)
 	UpdateAnalysis(ctx context.Context, id uint, summary string, tags string, mood string, importanceScore float64) error
@@ -68,6 +69,36 @@ func (r *SQLiteMemoryRepository) FindByID(ctx context.Context, id uint) (*model.
 		return nil, err
 	}
 	return &item, nil
+}
+
+func (r *SQLiteMemoryRepository) FindByIDs(ctx context.Context, ids []uint) ([]model.MemoryItem, error) {
+	if len(ids) == 0 {
+		return []model.MemoryItem{}, nil
+	}
+
+	var items []model.MemoryItem
+	err := r.db.WithContext(ctx).
+		Where("deleted_at IS NULL").
+		Where("id IN (?)", ids).
+		Find(&items).Error
+	if err != nil {
+		return nil, err
+	}
+
+	itemMap := make(map[uint]model.MemoryItem, len(items))
+	for _, item := range items {
+		itemMap[item.ID] = item
+	}
+
+	//按照Milvus的顺序重新排一遍
+	ordered := make([]model.MemoryItem, 0, len(items))
+	for _, id := range ids {
+		if item, ok := itemMap[id]; ok {
+			ordered = append(ordered, item)
+		}
+	}
+
+	return ordered, nil
 }
 
 func (r *SQLiteMemoryRepository) UpdateAnalysis(ctx context.Context, id uint, summary string, tags string, mood string, importanceScore float64) error {

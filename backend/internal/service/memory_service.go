@@ -123,3 +123,7 @@ func (s *MemoryService) GetByID(ctx context.Context, id uint) (*model.MemoryItem
 func (s *MemoryService) UpdateAnalysis(ctx context.Context, id uint, summary string, tags string, mood string, importanceScore float64) error {
 	return s.repo.UpdateAnalysis(ctx, id, summary, tags, mood, importanceScore)
 }
+
+func (s *MemoryService) FindByIDs(ctx context.Context, ids []uint) ([]model.MemoryItem, error) {
+	return s.repo.FindByIDs(ctx, ids)
+}

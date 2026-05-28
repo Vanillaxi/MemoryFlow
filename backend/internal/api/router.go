@@ -18,6 +18,7 @@ func RegisterRoutes(r *gin.Engine, memoryHandler *MemoryHandler, taskHandler *Ta
 		api.POST("memories/image", memoryHandler.CreateImageMemory)
 
 		api.GET("/memories/recent", memoryHandler.ListRecent)
+		api.GET("/memories/search", memoryHandler.SearchMemories)
 		api.GET("/timeline", memoryHandler.GetTimeline)
 
 		api.GET("/tasks/:id", taskHandler.GetTask)

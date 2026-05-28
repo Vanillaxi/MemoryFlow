@@ -6,6 +6,7 @@ import (
 	"log"
 	"memoryflow/internal/ai/aimodel"
 	"memoryflow/internal/ai/embedding"
+	"memoryflow/internal/ai/retriever"
 	"memoryflow/internal/ai/vectorstore"
 	"memoryflow/internal/ai/workflow/text_analyze"
 	"memoryflow/internal/api"
@@ -73,6 +74,12 @@ func main() {
 		cfg.Embedding.Dim,
 	)
 
+	memoryRetriever := retriever.NewMemoryRettriever(
+		embeddingClient,
+		milvusStore,
+		memoryService,
+	)
+
 	//初始化worker
 	worker := task.NewWorker(
 		taskService,
@@ -87,7 +94,7 @@ func main() {
 	localStorage := storage.NewLocalStorage(cfg.Storage.UploadDir)
 
 	//初始化Handler
-	memoryHandler := api.NewMemoryHandler(memoryService, taskService, localStorage)
+	memoryHandler := api.NewMemoryHandler(memoryService, taskService, localStorage, memoryRetriever)
 	taskHandler := api.NewTaskHandler(taskService)
 
 	//初始化router
