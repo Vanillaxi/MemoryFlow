@@ -43,6 +43,14 @@ func NewChatModel(baseURL string, apiKey string, modelName string) *ChatModel {
 
 // TODO:这版是OpenAI-compatible HTTP调用，待会再改Eino
 func (m *ChatModel) Generate(ctx context.Context, prompt string) (string, error) {
+	return m.GenerateWithSystem(
+		ctx,
+		"你是 MemoryFlow 的个人记忆分析助手，只输出 JSON。",
+		prompt,
+	)
+}
+
+func (m *ChatModel) GenerateWithSystem(ctx context.Context, systemPrompt string, userPrompt string) (string, error) {
 	if m.baseURL == "" {
 		return "", errors.New("aimodel base url is required")
 	}
@@ -58,11 +66,11 @@ func (m *ChatModel) Generate(ctx context.Context, prompt string) (string, error)
 		Messages: []chatMessage{
 			{
 				Role:    "system",
-				Content: "你是 MemoryFlow 的个人记忆分析助手，只输出 JSON。",
+				Content: systemPrompt,
 			},
 			{
 				Role:    "user",
-				Content: prompt,
+				Content: userPrompt,
 			},
 		},
 	}

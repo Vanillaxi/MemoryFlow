@@ -22,6 +22,11 @@ type MemoryHandler struct {
 	memoryAgent     *memory_agent.MemoryAgent
 }
 
+type AgentToolRequest struct {
+	Name      string         `json:"name"`
+	Arguments map[string]any `json:"arguments"`
+}
+
 func NewMemoryHandler(
 	memoryService *service.MemoryService,
 	taskService *service.TaskService,
@@ -238,6 +243,7 @@ func (h *MemoryHandler) SearchMemories(c *gin.Context) {
 }
 
 func (h *MemoryHandler) Ask(c *gin.Context) {
+	debug := c.Query("debug") == "true"
 	q := strings.TrimSpace(c.Query("q"))
 	if q == "" {
 		response.Error(c, http.StatusBadRequest, "q is required")
@@ -286,6 +292,7 @@ func (h *MemoryHandler) Ask(c *gin.Context) {
 		Type:      memoryType,
 		StartTime: startTime,
 		EndTime:   endTime,
+		Debug:     debug,
 	})
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, err.Error())
@@ -334,4 +341,23 @@ func (h *MemoryHandler) ReanalyzeMemory(c *gin.Context) {
 		"memory_id": item.ID,
 		"task":      task,
 	})
+}
+
+func (h *MemoryHandler) CallAgentTool(c *gin.Context) {
+	var req AgentToolRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	result, err := h.memoryAgent.CallTool(c.Request.Context(), memory_agent.ToolCall{
+		Name:      memory_agent.ToolName(req.Name),
+		Arguments: req.Arguments,
+	})
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response.OK(c, result)
 }

@@ -109,6 +109,7 @@ func main() {
 		memoryChatPipeline,
 		memoryRetriever,
 		memoryService,
+		chatModel,
 	)
 
 	// 初始化 worker

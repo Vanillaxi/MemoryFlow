@@ -8,21 +8,28 @@ import (
 	"memoryflow/internal/service"
 )
 
+type ChatModel interface {
+	Generate(ctx context.Context, prompt string) (string, error)
+	GenerateWithSystem(ctx context.Context, systemPrompt string, userPrompt string) (string, error)
+}
 type MemoryAgent struct {
 	chatPipeline    *memory_chat_pipeline.Pipeline
 	memoryRetriever *retriever.MemoryRetriever
 	memoryService   *service.MemoryService
+	chatModel       ChatModel
 }
 
 func NewMemoryAgent(
 	chatPipeline *memory_chat_pipeline.Pipeline,
 	memoryRetriever *retriever.MemoryRetriever,
 	memoryService *service.MemoryService,
+	chatModel ChatModel,
 ) *MemoryAgent {
 	return &MemoryAgent{
 		chatPipeline:    chatPipeline,
 		memoryRetriever: memoryRetriever,
 		memoryService:   memoryService,
+		chatModel:       chatModel,
 	}
 }
 
