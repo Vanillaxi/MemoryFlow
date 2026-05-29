@@ -1,7 +1,8 @@
 package api
 
 import (
-	"memoryflow/internal/ai/agent/memory_agent"
+	"memoryflow/internal/ai/agents/memory_agent"
+	"memoryflow/internal/ai/pipelines/memory_index_pipeline"
 	"memoryflow/internal/ai/retriever"
 	"memoryflow/internal/pkg/response"
 	"memoryflow/internal/service"
@@ -15,16 +16,12 @@ import (
 )
 
 type MemoryHandler struct {
-	memoryService   *service.MemoryService
-	taskService     *service.TaskService
-	storage         *storage.LocalStorage
-	memoryRetriever *retriever.MemoryRetriever
-	memoryAgent     *memory_agent.MemoryAgent
-}
-
-type AgentToolRequest struct {
-	Name      string         `json:"name"`
-	Arguments map[string]any `json:"arguments"`
+	memoryService       *service.MemoryService
+	taskService         *service.TaskService
+	storage             *storage.LocalStorage
+	memoryRetriever     *retriever.MemoryRetriever
+	memoryAgent         *memory_agent.MemoryAgent
+	memoryIndexPipeline *memory_index_pipeline.Pipeline
 }
 
 func NewMemoryHandler(
@@ -33,13 +30,15 @@ func NewMemoryHandler(
 	storage *storage.LocalStorage,
 	memoryRetriever *retriever.MemoryRetriever,
 	memoryAgent *memory_agent.MemoryAgent,
+	memoryIndexPipeline *memory_index_pipeline.Pipeline,
 ) *MemoryHandler {
 	return &MemoryHandler{
-		memoryService:   memoryService,
-		taskService:     taskService,
-		storage:         storage,
-		memoryRetriever: memoryRetriever,
-		memoryAgent:     memoryAgent,
+		memoryService:       memoryService,
+		taskService:         taskService,
+		storage:             storage,
+		memoryRetriever:     memoryRetriever,
+		memoryAgent:         memoryAgent,
+		memoryIndexPipeline: memoryIndexPipeline,
 	}
 }
 
@@ -286,7 +285,7 @@ func (h *MemoryHandler) Ask(c *gin.Context) {
 		endTime = &parsed
 	}
 
-	result, err := h.memoryAgent.Chat(c.Request.Context(), memory_agent.ChatInput{
+	result, err := h.memoryAgent.Invoke(c.Request.Context(), memory_agent.AgentInput{
 		Message:   q,
 		TopK:      topK,
 		Type:      memoryType,
@@ -343,16 +342,17 @@ func (h *MemoryHandler) ReanalyzeMemory(c *gin.Context) {
 	})
 }
 
-func (h *MemoryHandler) CallAgentTool(c *gin.Context) {
-	var req AgentToolRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, err.Error())
-		return
+func (h *MemoryHandler) ReindexMemories(c *gin.Context) {
+	batchSize := 100
+
+	if batchSizeStr := c.DefaultQuery("batch_size", "100"); batchSizeStr != "" {
+		if parsed, err := strconv.Atoi(batchSizeStr); err == nil && parsed > 0 {
+			batchSize = parsed
+		}
 	}
 
-	result, err := h.memoryAgent.CallTool(c.Request.Context(), memory_agent.ToolCall{
-		Name:      memory_agent.ToolName(req.Name),
-		Arguments: req.Arguments,
+	result, err := h.memoryIndexPipeline.ReindexAll(c.Request.Context(), memory_index_pipeline.ReindexInput{
+		BatchSize: batchSize,
 	})
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, err.Error())
@@ -360,4 +360,14 @@ func (h *MemoryHandler) CallAgentTool(c *gin.Context) {
 	}
 
 	response.OK(c, result)
+}
+
+func (h *MemoryHandler) ListAgentTools(c *gin.Context) {
+	infos, err := h.memoryAgent.DebugListEinoTools(c.Request.Context())
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response.OK(c, infos)
 }

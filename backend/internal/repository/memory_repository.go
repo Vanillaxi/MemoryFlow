@@ -15,6 +15,7 @@ type MemoryRepository interface {
 	FindRecent(ctx context.Context, limit int) ([]model.MemoryItem, error)
 	FindByTimeRange(ctx context.Context, start, end time.Time, limit int) ([]model.MemoryItem, error)
 	UpdateAnalysis(ctx context.Context, id uint, summary string, tags string, mood string, importanceScore float64) error
+	ListForIndex(ctx context.Context, limit int, offset int) ([]model.MemoryItem, error)
 }
 
 type SQLiteMemoryRepository struct {
@@ -111,4 +112,21 @@ func (r *SQLiteMemoryRepository) UpdateAnalysis(ctx context.Context, id uint, su
 			"mood":             mood,
 			"importance_score": importanceScore,
 		}).Error
+}
+
+func (r *SQLiteMemoryRepository) ListForIndex(ctx context.Context, limit int, offset int) ([]model.MemoryItem, error) {
+	var items []model.MemoryItem
+
+	if limit <= 0 {
+		limit = 100
+	}
+
+	err := r.db.WithContext(ctx).
+		Where("deleted_at IS NULL").
+		Order("id ASC").
+		Limit(limit).
+		Offset(offset).
+		Find(&items).Error
+
+	return items, err
 }

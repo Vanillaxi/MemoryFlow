@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"memoryflow/internal/ai/agent/memory_agent"
+	"memoryflow/internal/ai/agents/memory_agent"
 	"memoryflow/internal/ai/aimodel"
 	"memoryflow/internal/ai/embedding"
 	"memoryflow/internal/ai/pipelines/memory_chat_pipeline"
+	"memoryflow/internal/ai/pipelines/memory_index_pipeline"
 	"memoryflow/internal/ai/reranker"
 	"memoryflow/internal/ai/retriever"
 	"memoryflow/internal/ai/vectorstore"
@@ -104,6 +105,14 @@ func main() {
 		log.Fatalf("init memory chat pipeline failed: %v", err)
 	}
 
+	memoryIndexPipeline := memory_index_pipeline.NewPipeline(
+		memoryService,
+		memory_index_pipeline.NewIndexer(
+			embeddingClient,
+			milvusStore,
+		),
+	)
+
 	//MemoryAgent
 	memoryAgent := memory_agent.NewMemoryAgent(
 		memoryChatPipeline,
@@ -133,6 +142,7 @@ func main() {
 		localStorage,
 		memoryRetriever,
 		memoryAgent,
+		memoryIndexPipeline,
 	)
 	taskHandler := api.NewTaskHandler(taskService)
 

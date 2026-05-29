@@ -12,6 +12,7 @@ type ChatModel interface {
 	Generate(ctx context.Context, prompt string) (string, error)
 	GenerateWithSystem(ctx context.Context, systemPrompt string, userPrompt string) (string, error)
 }
+
 type MemoryAgent struct {
 	chatPipeline    *memory_chat_pipeline.Pipeline
 	memoryRetriever *retriever.MemoryRetriever
@@ -33,6 +34,37 @@ func NewMemoryAgent(
 	}
 }
 
-func (a *MemoryAgent) Chat(ctx context.Context, input ChatInput) (*ChatOutput, error) {
-	return a.Orchestrate(ctx, input)
+func (a *MemoryAgent) Invoke(ctx context.Context, input AgentInput) (*AgentOutput, error) {
+	result, err := a.AskMemory(ctx, AskMemoryInput{
+		Question:  input.Message,
+		TopK:      input.TopK,
+		Type:      input.Type,
+		StartTime: input.StartTime,
+		EndTime:   input.EndTime,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	output := &AgentOutput{
+		Answer:     result.Answer,
+		References: result.References,
+		Intent:     string(ToolAskMemory),
+	}
+
+	if input.Debug {
+		output.Trace = &AgentTrace{
+			RouterTool: string(ToolAskMemory),
+			RouterArguments: map[string]any{
+				"question": input.Message,
+				"top_k":    input.TopK,
+				"type":     input.Type,
+			},
+			UsedFallback:    false,
+			Summarized:      true,
+			ToolResultCount: len(result.References),
+		}
+	}
+
+	return output, nil
 }

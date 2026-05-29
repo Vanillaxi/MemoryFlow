@@ -10,6 +10,15 @@ import (
 	"memoryflow/internal/model"
 )
 
+type ToolName string
+
+const (
+	ToolAskMemory    ToolName = "ask_memory"
+	ToolSearchMemory ToolName = "search_memory"
+	ToolListRecent   ToolName = "list_recent"
+	ToolGetTimeline  ToolName = "get_timeline"
+)
+
 type AskMemoryInput struct {
 	Question  string
 	TopK      int

@@ -127,3 +127,7 @@ func (s *MemoryService) UpdateAnalysis(ctx context.Context, id uint, summary str
 func (s *MemoryService) FindByIDs(ctx context.Context, ids []uint) ([]model.MemoryItem, error) {
 	return s.repo.FindByIDs(ctx, ids)
 }
+
+func (s *MemoryService) ListForIndex(ctx context.Context, limit int, offset int) ([]model.MemoryItem, error) {
+	return s.repo.ListForIndex(ctx, limit, offset)
+}
