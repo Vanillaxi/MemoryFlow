@@ -1,14 +1,8 @@
 package memory_agent
 
 import (
-	"context"
-	"fmt"
 	"sync"
 	"time"
-
-	"github.com/cloudwego/eino/callbacks"
-	"github.com/cloudwego/eino/compose"
-	einoagent "github.com/cloudwego/eino/flow/agent"
 )
 
 const reactTraceMode = "eino_react"
@@ -84,47 +78,10 @@ func (c *TraceCollector) Trace() *AgentTrace {
 	}
 }
 
-func (c *TraceCollector) EinoAgentOption() einoagent.AgentOption {
-	return einoagent.WithComposeOptions(compose.WithCallbacks(c.EinoHandler()))
-}
-
-func (c *TraceCollector) EinoHandler() callbacks.Handler {
-	return callbacks.NewHandlerBuilder().
-		OnStartFn(func(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {
-			c.Start(traceNode(info), input)
-			return ctx
-		}).
-		OnEndFn(func(ctx context.Context, info *callbacks.RunInfo, output callbacks.CallbackOutput) context.Context {
-			c.End(traceNode(info), output)
-			return ctx
-		}).
-		OnErrorFn(func(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
-			c.Error(traceNode(info), err)
-			return ctx
-		}).
-		Build()
-}
-
 func (c *TraceCollector) append(step TraceStep) {
 	c.mu.Lock()
 	c.steps = append(c.steps, step)
 	c.mu.Unlock()
-}
-
-func traceNode(info *callbacks.RunInfo) string {
-	if info == nil {
-		return "unknown"
-	}
-	if info.Name != "" {
-		return info.Name
-	}
-	if info.Component != "" {
-		return string(info.Component)
-	}
-	if info.Type != "" {
-		return info.Type
-	}
-	return fmt.Sprintf("%#v", info)
 }
 
 func traceTime() string {

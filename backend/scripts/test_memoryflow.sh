@@ -1,118 +1,53 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-set -e
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKEND_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-BASE_URL="${BASE_URL:-http://localhost:8080}"
-MEMORY_ID="${MEMORY_ID:-20}"
+cd "${BACKEND_DIR}"
 
-echo "========================================"
-echo "MemoryFlow API Test"
-echo "BASE_URL=${BASE_URL}"
-echo "MEMORY_ID=${MEMORY_ID}"
-echo "========================================"
-echo
-
-check_jq() {
-  if ! command -v jq >/dev/null 2>&1; then
-    echo "❌ jq not found. Please install jq first."
-    echo "macOS: brew install jq"
-    exit 1
-  fi
+section() {
+  printf '\n==> %s\n' "$1"
 }
 
-request_get() {
-  local name="$1"
-  local url="$2"
+section "Running Go tests"
+go test ./...
 
-  echo "----------------------------------------"
-  echo "TEST: ${name}"
-  echo "GET ${url}"
-  echo "----------------------------------------"
+section "Building cmd/server"
+go build ./cmd/server
 
-  curl -s "${url}" | jq
-  echo
-}
+section "Building cmd/memory_agent_cmd"
+go build ./cmd/memory_agent_cmd
 
-request_post() {
-  local name="$1"
-  local url="$2"
+section "Building cmd/memory_chat_cmd"
+go build ./cmd/memory_chat_cmd
 
-  echo "----------------------------------------"
-  echo "TEST: ${name}"
-  echo "POST ${url}"
-  echo "----------------------------------------"
+section "Building cmd/memory_index_cmd"
+go build ./cmd/memory_index_cmd
 
-  curl -s -X POST "${url}" | jq
-  echo
-}
+section "Building cmd/text_analyze_cmd"
+go build ./cmd/text_analyze_cmd
 
-check_jq
+section "Building cmd/image_analyze_cmd"
+go build ./cmd/image_analyze_cmd
 
-echo "✅ jq exists"
-echo
+if [[ "${RUN_AI:-0}" == "1" ]]; then
+  section "Smoke test: text_analyze_cmd"
+  go run ./cmd/text_analyze_cmd "今天我把 MemoryFlow 的 cmd 调试入口补好了"
 
-# 1. Eino tools list
-request_get \
-  "Eino tool list" \
-  "${BASE_URL}/api/agent/tools"
+  section "Smoke test: memory_chat_cmd"
+  go run ./cmd/memory_chat_cmd "我最近在做什么项目"
 
-# 2. Main ask endpoint: basic QA
-request_get \
-  "Ask memory basic" \
-  "${BASE_URL}/api/memories/ask?q=我什么时候修好了embedding&debug=true"
+  section "Smoke test: memory_agent_cmd"
+  go run ./cmd/memory_agent_cmd "最近我记录了什么"
+fi
 
-# 3. Ask with type filter
-request_get \
-  "Ask memory with type=image" \
-  "${BASE_URL}/api/memories/ask?q=图片记忆&type=image&debug=true"
+if [[ "${RUN_INDEX:-0}" == "1" ]]; then
+  section "Smoke test: memory_index_cmd"
+  go run ./cmd/memory_index_cmd --batch-size=50
+fi
 
-# 4. Ask with time filter
-request_get \
-  "Ask memory with date range" \
-  "${BASE_URL}/api/memories/ask?q=MemoryFlow&start=2026-05-01&end=2026-06-01&debug=true"
+section "Cleaning build artifacts"
+rm -f server memory_agent_cmd memory_chat_cmd memory_index_cmd text_analyze_cmd image_analyze_cmd
 
-# 5. Semantic search
-request_get \
-  "Semantic search" \
-  "${BASE_URL}/api/memories/search?q=MemoryFlow&top_k=5"
-
-# 6. Semantic search with type filter
-request_get \
-  "Semantic search with type=text" \
-  "${BASE_URL}/api/memories/search?q=MemoryFlow&type=text&top_k=5"
-
-# 7. Semantic search with date range
-request_get \
-  "Semantic search with date range" \
-  "${BASE_URL}/api/memories/search?q=MemoryFlow&start=2026-05-01&end=2026-06-01&top_k=5"
-
-# 8. Recent memories
-request_get \
-  "Recent memories" \
-  "${BASE_URL}/api/memories/recent?limit=5"
-
-# 9. Reindex
-request_post \
-  "Reindex memories" \
-  "${BASE_URL}/api/memories/reindex?batch_size=50"
-
-# 10. Search again after reindex
-request_get \
-  "Semantic search after reindex" \
-  "${BASE_URL}/api/memories/search?q=MemoryFlow&top_k=5"
-
-# 11. Reanalyze one memory
-request_post \
-  "Reanalyze memory ${MEMORY_ID}" \
-  "${BASE_URL}/api/memories/${MEMORY_ID}/reanalyze"
-
-echo "========================================"
-echo "✅ All requests sent."
-echo
-echo "Manual checks:"
-echo "1. /api/agent/tools should contain ask_memory/search_memory/list_recent/get_timeline"
-echo "2. /api/memories/ask should return intent=ask_memory"
-echo "3. answer should be natural Chinese"
-echo "4. answer should NOT contain Go struct fields like Memory:{}, ContentText, OccurredAt, DeletedAt"
-echo "5. /api/agent/tool should be removed or return 404"
-echo "========================================"
+printf '\nAll checks passed\n'

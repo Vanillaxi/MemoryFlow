@@ -1,9 +1,9 @@
-package main
+package bootstrap
 
 import (
 	"context"
-	"fmt"
 	"log"
+
 	"memoryflow/internal/ai/agent/memory_agent"
 	"memoryflow/internal/ai/component/chatmodel"
 	"memoryflow/internal/ai/component/embedding"
@@ -14,40 +14,58 @@ import (
 	"memoryflow/internal/ai/pipeline/memory_index"
 	"memoryflow/internal/ai/workflow/image_analyze"
 	"memoryflow/internal/ai/workflow/text_analyze"
-	"memoryflow/internal/api"
 	"memoryflow/internal/config"
 	"memoryflow/internal/domain/repository"
 	"memoryflow/internal/domain/service"
 	"memoryflow/internal/storage"
 	"memoryflow/internal/task"
-
-	"github.com/gin-gonic/gin"
 )
 
-func main() {
-	ctx := context.Background()
+const DefaultConfigPath = "configs/config.yaml"
 
-	// config
-	cfg, err := config.LoadConfig("configs/config.yaml")
+type App struct {
+	Config *config.Config
+
+	MemoryService *service.MemoryService
+	TaskService   *service.TaskService
+
+	AnalysisChatModel *chatmodel.ChatModel
+	EinoChatModel     *chatmodel.ArkEinoChatModel
+
+	TextAnalyzeWorkflow  *text_analyze.Workflow
+	ImageAnalyzeWorkflow *image_analyze.Workflow
+
+	MilvusStore     *vectorstore.MilvusStore
+	EmbeddingClient *embedding.Client
+	MemoryRetriever *retriever.MemoryRetriever
+	MemoryReranker  *reranker.MemoryReranker
+
+	MemoryChatPipeline  *memory_chat.Pipeline
+	MemoryIndexPipeline *memory_index.Pipeline
+	MemoryAgent         *memory_agent.MemoryAgent
+
+	Storage *storage.LocalStorage
+	Worker  *task.Worker
+}
+
+func NewApp(ctx context.Context) (*App, error) {
+	cfg, err := config.LoadConfig(DefaultConfigPath)
 	if err != nil {
-		log.Fatal("load config failed", err)
+		return nil, err
 	}
 
-	// 初始化 sqlite
 	db, err := repository.InitSQLite(cfg.Database.DSN)
 	if err != nil {
-		log.Fatalf("init sqlite failed: %v", err)
+		return nil, err
 	}
 
-	// 初始化 repo/service
 	memoryRepo := repository.NewSQLiteMemoryRepository(db)
 	memoryService := service.NewMemoryService(memoryRepo)
 
 	taskRepo := repository.NewSQLiteTaskRepository(db)
 	taskService := service.NewTaskService(taskRepo)
 
-	// 初始化 chat model + workflow
-	chatModel := chatmodel.NewChatModel(
+	analysisChatModel := chatmodel.NewChatModel(
 		cfg.Model.BaseURL,
 		cfg.Model.APIKey,
 		cfg.Model.ModelName,
@@ -59,10 +77,9 @@ func main() {
 		ModelName: cfg.Model.ModelName,
 	})
 
-	textAnalyzeWorkflow := text_analyze.NewWorkflow(chatModel)
+	textAnalyzeWorkflow := text_analyze.NewWorkflow(analysisChatModel)
 	imageAnalyzeWorkflow := image_analyze.NewWorkflow()
 
-	// 初始化 MilvusStore
 	milvusStore, err := vectorstore.NewMilvusStore(
 		ctx,
 		cfg.Milvus.Address,
@@ -70,20 +87,14 @@ func main() {
 		cfg.Embedding.Dim,
 	)
 	if err != nil {
-		log.Fatalf("init milvus store failed: %v", err)
+		return nil, err
 	}
 
 	if err := milvusStore.EnsureCollection(ctx); err != nil {
-		log.Fatalf("ensure collection failed: %v", err)
+		_ = milvusStore.Close(ctx)
+		return nil, err
 	}
 
-	defer func() {
-		if err := milvusStore.Close(ctx); err != nil {
-			log.Printf("close milvus store failed: %v", err)
-		}
-	}()
-
-	// 初始化 embedding client
 	embeddingClient := embedding.NewClient(
 		cfg.Embedding.BaseURL,
 		cfg.Embedding.APIKey,
@@ -91,7 +102,6 @@ func main() {
 		cfg.Embedding.Dim,
 	)
 
-	// 初始化 retriever/reranker
 	memoryRetriever := retriever.NewMemoryRetriever(
 		embeddingClient,
 		milvusStore,
@@ -100,15 +110,15 @@ func main() {
 
 	memoryReranker := reranker.NewMemoryReranker()
 
-	//  Eino memory chat pipeline
 	memoryChatPipeline, err := memory_chat.NewPipeline(
 		ctx,
 		memoryRetriever,
 		memoryReranker,
-		chatModel,
+		analysisChatModel,
 	)
 	if err != nil {
-		log.Fatalf("init memory chat pipeline failed: %v", err)
+		_ = milvusStore.Close(ctx)
+		return nil, err
 	}
 
 	memoryIndexPipeline := memory_index.NewPipeline(
@@ -119,7 +129,6 @@ func main() {
 		),
 	)
 
-	//MemoryAgent
 	memoryAgent, err := memory_agent.NewMemoryAgent(
 		ctx,
 		memoryChatPipeline,
@@ -128,10 +137,12 @@ func main() {
 		einoChatModel,
 	)
 	if err != nil {
-		log.Fatalf("init memory agent failed: %v", err)
+		_ = milvusStore.Close(ctx)
+		return nil, err
 	}
 
-	// 初始化 worker
+	localStorage := storage.NewLocalStorage(cfg.Storage.UploadDir)
+
 	worker := task.NewWorker(
 		taskService,
 		memoryService,
@@ -140,28 +151,45 @@ func main() {
 		embeddingClient,
 		milvusStore,
 	)
-	go worker.Start(ctx)
 
-	// 初始化 storage
-	localStorage := storage.NewLocalStorage(cfg.Storage.UploadDir)
+	return &App{
+		Config: cfg,
 
-	// 初始化 handler
-	memoryHandler := api.NewMemoryHandler(
-		memoryService,
-		taskService,
-		localStorage,
-		memoryRetriever,
-		memoryAgent,
-		memoryIndexPipeline,
-	)
-	taskHandler := api.NewTaskHandler(taskService)
+		MemoryService: memoryService,
+		TaskService:   taskService,
 
-	// 初始化 router
-	r := gin.Default()
-	api.RegisterRoutes(r, memoryHandler, taskHandler, cfg.Storage.UploadDir)
+		AnalysisChatModel: analysisChatModel,
+		EinoChatModel:     einoChatModel,
 
-	addr := fmt.Sprintf(":%d", cfg.Server.Port)
-	if err := r.Run(addr); err != nil {
-		log.Fatalf("server run failed: %v", err)
+		TextAnalyzeWorkflow:  textAnalyzeWorkflow,
+		ImageAnalyzeWorkflow: imageAnalyzeWorkflow,
+
+		MilvusStore:     milvusStore,
+		EmbeddingClient: embeddingClient,
+		MemoryRetriever: memoryRetriever,
+		MemoryReranker:  memoryReranker,
+
+		MemoryChatPipeline:  memoryChatPipeline,
+		MemoryIndexPipeline: memoryIndexPipeline,
+		MemoryAgent:         memoryAgent,
+
+		Storage: localStorage,
+		Worker:  worker,
+	}, nil
+}
+
+func (a *App) StartWorker(ctx context.Context) {
+	if a == nil || a.Worker == nil {
+		return
+	}
+	go a.Worker.Start(ctx)
+}
+
+func (a *App) Close(ctx context.Context) {
+	if a == nil || a.MilvusStore == nil {
+		return
+	}
+	if err := a.MilvusStore.Close(ctx); err != nil {
+		log.Printf("close milvus store failed: %v", err)
 	}
 }

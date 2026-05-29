@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"github.com/cloudwego/eino/components/model"
-	einoagent "github.com/cloudwego/eino/flow/agent"
 	"github.com/cloudwego/eino/flow/agent/react"
 	"github.com/cloudwego/eino/schema"
 
@@ -70,13 +69,11 @@ func (a *MemoryAgent) Invoke(ctx context.Context, input AgentInput) (*AgentOutpu
 
 	msg := schema.UserMessage(input.Message)
 
-	var opts []einoagent.AgentOption
 	if collector != nil {
 		collector.Start("EinoReactAgent.Generate", traceInvokeInput(input))
-		opts = append(opts, collector.EinoAgentOption())
 	}
 
-	result, err := a.reactAgent.Generate(ctx, []*schema.Message{msg}, opts...)
+	result, err := a.reactAgent.Generate(ctx, []*schema.Message{msg})
 	if err != nil {
 		if collector != nil {
 			collector.Error("EinoReactAgent.Generate", err)
@@ -89,7 +86,7 @@ func (a *MemoryAgent) Invoke(ctx context.Context, input AgentInput) (*AgentOutpu
 		return nil, err
 	}
 	if collector != nil {
-		collector.End("EinoReactAgent.Generate", result)
+		collector.End("EinoReactAgent.Generate", traceAnswerOutput(result.Content))
 	}
 
 	output := &AgentOutput{
@@ -98,14 +95,25 @@ func (a *MemoryAgent) Invoke(ctx context.Context, input AgentInput) (*AgentOutpu
 	}
 
 	if input.Debug {
-		collector.End("MemoryAgent.Invoke", &AgentOutput{
-			Answer: result.Content,
-			Intent: "eino_react",
-		})
+		collector.End("MemoryAgent.Invoke", traceAnswerOutput(result.Content))
 		output.Trace = collector.Trace()
 	}
 
 	return output, nil
+}
+
+func traceAnswerOutput(answer string) map[string]any {
+	return map[string]any{
+		"answer_summary": summarizeTraceText(answer, 160),
+	}
+}
+
+func summarizeTraceText(text string, limit int) string {
+	runes := []rune(text)
+	if limit <= 0 || len(runes) <= limit {
+		return text
+	}
+	return string(runes[:limit]) + "..."
 }
 
 func traceInvokeInput(input AgentInput) map[string]any {
