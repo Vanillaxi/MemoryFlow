@@ -371,3 +371,19 @@ func (h *MemoryHandler) ListAgentTools(c *gin.Context) {
 
 	response.OK(c, infos)
 }
+
+func (h *MemoryHandler) AskMemoryAgent(c *gin.Context) {
+	var req memory_agent.AgentInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+
+	output, err := h.memoryAgent.Invoke(c.Request.Context(), req)
+	if err != nil {
+		response.Error(c, 500, err.Error())
+		return
+	}
+
+	response.OK(c, output)
+}
