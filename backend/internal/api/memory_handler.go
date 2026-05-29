@@ -1,11 +1,11 @@
 package api
 
 import (
-	"memoryflow/internal/ai/agents/memory_agent"
-	"memoryflow/internal/ai/pipelines/memory_index_pipeline"
-	"memoryflow/internal/ai/retriever"
+	"memoryflow/internal/ai/agent/memory_agent"
+	"memoryflow/internal/ai/component/retriever"
+	"memoryflow/internal/ai/pipeline/memory_index"
+	"memoryflow/internal/domain/service"
 	"memoryflow/internal/pkg/response"
-	"memoryflow/internal/service"
 	"memoryflow/internal/storage"
 	"net/http"
 	"strconv"
@@ -21,7 +21,7 @@ type MemoryHandler struct {
 	storage             *storage.LocalStorage
 	memoryRetriever     *retriever.MemoryRetriever
 	memoryAgent         *memory_agent.MemoryAgent
-	memoryIndexPipeline *memory_index_pipeline.Pipeline
+	memoryIndexPipeline *memory_index.Pipeline
 }
 
 func NewMemoryHandler(
@@ -30,7 +30,7 @@ func NewMemoryHandler(
 	storage *storage.LocalStorage,
 	memoryRetriever *retriever.MemoryRetriever,
 	memoryAgent *memory_agent.MemoryAgent,
-	memoryIndexPipeline *memory_index_pipeline.Pipeline,
+	memoryIndexPipeline *memory_index.Pipeline,
 ) *MemoryHandler {
 	return &MemoryHandler{
 		memoryService:       memoryService,
@@ -351,7 +351,7 @@ func (h *MemoryHandler) ReindexMemories(c *gin.Context) {
 		}
 	}
 
-	result, err := h.memoryIndexPipeline.ReindexAll(c.Request.Context(), memory_index_pipeline.ReindexInput{
+	result, err := h.memoryIndexPipeline.ReindexAll(c.Request.Context(), memory_index.ReindexInput{
 		BatchSize: batchSize,
 	})
 	if err != nil {

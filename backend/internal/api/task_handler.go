@@ -1,8 +1,8 @@
 package api
 
 import (
+	"memoryflow/internal/domain/service"
 	"memoryflow/internal/pkg/response"
-	"memoryflow/internal/service"
 	"net/http"
 	"strconv"
 
