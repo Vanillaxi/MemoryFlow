@@ -27,26 +27,54 @@ func (t *EinoMemoryTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 }
 
 func (t *EinoMemoryTool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ...tool.Option) (string, error) {
+	collector := TraceCollectorFromContext(ctx)
+	if collector != nil {
+		collector.Event(string(t.name), "tool_start", map[string]any{
+			"arguments": summarizeTraceText(sanitizeTraceJSON(argumentsInJSON), 500),
+		}, nil, nil)
+	}
+
 	var args map[string]any
 	if err := json.Unmarshal([]byte(argumentsInJSON), &args); err != nil {
-		return "", fmt.Errorf("invalid tool arguments json: %w", err)
+		err = fmt.Errorf("invalid tool arguments json: %w", err)
+		if collector != nil {
+			collector.Event(string(t.name), "tool_error", nil, nil, err)
+		}
+		return "", err
 	}
 
 	if t.run == nil {
-		return "", fmt.Errorf("tool %s has no runner", t.name)
+		err := fmt.Errorf("tool %s has no runner", t.name)
+		if collector != nil {
+			collector.Event(string(t.name), "tool_error", nil, nil, err)
+		}
+		return "", err
 	}
 
 	result, err := t.run(ctx, args)
 	if err != nil {
+		if collector != nil {
+			collector.Event(string(t.name), "tool_error", nil, nil, err)
+		}
 		return "", err
 	}
 
 	bytes, err := json.Marshal(result)
 	if err != nil {
+		if collector != nil {
+			collector.Event(string(t.name), "tool_error", nil, nil, err)
+		}
 		return "", err
 	}
 
-	return string(bytes), nil
+	output := string(bytes)
+	if collector != nil {
+		collector.Event(string(t.name), "tool_end", nil, map[string]any{
+			"summary": summarizeTraceText(sanitizeTraceJSON(output), 500),
+		}, nil)
+	}
+
+	return output, nil
 }
 
 func (a *MemoryAgent) BaseTools() []tool.BaseTool {

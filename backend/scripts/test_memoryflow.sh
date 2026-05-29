@@ -38,8 +38,8 @@ if [[ "${RUN_AI:-0}" == "1" ]]; then
   section "Smoke test: memory_chat_cmd"
   go run ./cmd/memory_chat_cmd "我最近在做什么项目"
 
-  section "Smoke test: memory_agent_cmd"
-  go run ./cmd/memory_agent_cmd "最近我记录了什么"
+  section "Smoke test: memory_agent_cmd debug trace"
+  go run ./cmd/memory_agent_cmd --debug "最近我记录了什么"
 fi
 
 if [[ "${RUN_INDEX:-0}" == "1" ]]; then

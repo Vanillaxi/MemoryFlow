@@ -5,6 +5,8 @@ import (
 	"errors"
 
 	"github.com/cloudwego/eino/components/model"
+	"github.com/cloudwego/eino/compose"
+	einoagent "github.com/cloudwego/eino/flow/agent"
 	"github.com/cloudwego/eino/flow/agent/react"
 	"github.com/cloudwego/eino/schema"
 
@@ -68,12 +70,15 @@ func (a *MemoryAgent) Invoke(ctx context.Context, input AgentInput) (*AgentOutpu
 	}
 
 	msg := schema.UserMessage(input.Message)
+	var opts []einoagent.AgentOption
 
 	if collector != nil {
+		ctx = ContextWithTraceCollector(ctx, collector)
+		opts = append(opts, einoagent.WithComposeOptions(compose.WithCallbacks(NewEinoTraceHandler(collector))))
 		collector.Start("EinoReactAgent.Generate", traceInvokeInput(input))
 	}
 
-	result, err := a.reactAgent.Generate(ctx, []*schema.Message{msg})
+	result, err := a.reactAgent.Generate(ctx, []*schema.Message{msg}, opts...)
 	if err != nil {
 		if collector != nil {
 			collector.Error("EinoReactAgent.Generate", err)

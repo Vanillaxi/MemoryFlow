@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 
 	"memoryflow/internal/ai/agent/memory_agent"
@@ -16,7 +16,10 @@ const defaultQuestion = "最近我记录了什么？"
 
 func main() {
 	ctx := context.Background()
-	question := strings.TrimSpace(strings.Join(os.Args[1:], " "))
+	debug := flag.Bool("debug", false, "print MemoryAgent debug trace")
+	flag.Parse()
+
+	question := strings.TrimSpace(strings.Join(flag.Args(), " "))
 	if question == "" {
 		question = defaultQuestion
 	}
@@ -30,7 +33,7 @@ func main() {
 	output, err := app.MemoryAgent.Invoke(ctx, memory_agent.AgentInput{
 		Message: question,
 		TopK:    20,
-		Debug:   true,
+		Debug:   *debug,
 	})
 	if err != nil {
 		log.Fatalf("memory agent invoke failed: %v", err)
