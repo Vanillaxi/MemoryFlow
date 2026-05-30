@@ -22,15 +22,15 @@ func BuildMemoryContext(memories []retriever.RetrievedMemory) string {
 		builder.WriteString(fmt.Sprintf("类型: %s\n", memory.Type))
 
 		if strings.TrimSpace(memory.ContentText) != "" {
-			builder.WriteString(fmt.Sprintf("内容: %s\n", memory.ContentText))
+			builder.WriteString(fmt.Sprintf("内容: %s\n", truncateRunes(memory.ContentText, 1000)))
 		}
 
 		if strings.TrimSpace(memory.Summary) != "" {
-			builder.WriteString(fmt.Sprintf("摘要: %s\n", memory.Summary))
+			builder.WriteString(fmt.Sprintf("摘要: %s\n", truncateRunes(memory.Summary, 500)))
 		}
 
 		if strings.TrimSpace(memory.Tags) != "" {
-			builder.WriteString(fmt.Sprintf("标签: %s\n", memory.Tags))
+			builder.WriteString(fmt.Sprintf("标签: %s\n", truncateRunes(memory.Tags, 300)))
 		}
 
 		if strings.TrimSpace(memory.Mood) != "" {

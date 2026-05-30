@@ -9,27 +9,23 @@ import (
 	einoagent "github.com/cloudwego/eino/flow/agent"
 	"github.com/cloudwego/eino/flow/agent/react"
 	"github.com/cloudwego/eino/schema"
-
-	"memoryflow/internal/ai/component/retriever"
-	"memoryflow/internal/ai/pipeline/memory_chat"
-	"memoryflow/internal/domain/service"
 )
 
 var ErrMemoryAgentNotInitialized = errors.New("memory agent is not initialized")
 
 type MemoryAgent struct {
-	chatPipeline    *memory_chat.Pipeline
-	memoryRetriever *retriever.MemoryRetriever
-	memoryService   *service.MemoryService
+	chatPipeline    ChatPipeline
+	memoryRetriever MemoryRetriever
+	memoryService   MemoryService
 
 	reactAgent *react.Agent
 }
 
 func NewMemoryAgent(
 	ctx context.Context,
-	chatPipeline *memory_chat.Pipeline,
-	memoryRetriever *retriever.MemoryRetriever,
-	memoryService *service.MemoryService,
+	chatPipeline ChatPipeline,
+	memoryRetriever MemoryRetriever,
+	memoryService MemoryService,
 	toolCallingModel model.ToolCallingChatModel,
 ) (*MemoryAgent, error) {
 	a := &MemoryAgent{

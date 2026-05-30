@@ -3,18 +3,26 @@ package memory_index
 import (
 	"context"
 
-	"memoryflow/internal/ai/component/embedding"
 	"memoryflow/internal/ai/component/vectorstore"
 )
 
 type Indexer struct {
-	embeddingClient *embedding.Client
-	milvusStore     *vectorstore.MilvusStore
+	embeddingClient EmbeddingClient
+	milvusStore     VectorStore
+}
+
+type EmbeddingClient interface {
+	Embed(ctx context.Context, text string) ([]float32, error)
+}
+
+type VectorStore interface {
+	DeleteMemoryVector(ctx context.Context, memoryID int64) error
+	InsertMemoryVector(ctx context.Context, item vectorstore.MemoryVector) error
 }
 
 func NewIndexer(
-	embeddingClient *embedding.Client,
-	milvusStore *vectorstore.MilvusStore,
+	embeddingClient EmbeddingClient,
+	milvusStore VectorStore,
 ) *Indexer {
 	return &Indexer{
 		embeddingClient: embeddingClient,

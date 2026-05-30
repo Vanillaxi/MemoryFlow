@@ -3,10 +3,8 @@ package retriever
 import (
 	"context"
 	"errors"
-	"memoryflow/internal/ai/component/embedding"
 	"memoryflow/internal/ai/component/vectorstore"
 	"memoryflow/internal/domain/model"
-	"memoryflow/internal/domain/service"
 	"strings"
 	"time"
 )
@@ -23,13 +21,25 @@ type RetrieveOptions struct {
 	EndTime   *time.Time
 }
 
-type MemoryRetriever struct {
-	embeddingClient *embedding.Client
-	milvusStore     *vectorstore.MilvusStore
-	memoryService   *service.MemoryService
+type EmbeddingClient interface {
+	Embed(ctx context.Context, text string) ([]float32, error)
 }
 
-func NewMemoryRetriever(embeddingClient *embedding.Client, milvusStore *vectorstore.MilvusStore, memoryService *service.MemoryService) *MemoryRetriever {
+type VectorStore interface {
+	SearchMemoryVector(ctx context.Context, vector []float32, opt vectorstore.SearchOptions) ([]vectorstore.SearchResult, error)
+}
+
+type MemoryService interface {
+	FindByIDs(ctx context.Context, ids []uint) ([]model.MemoryItem, error)
+}
+
+type MemoryRetriever struct {
+	embeddingClient EmbeddingClient
+	milvusStore     VectorStore
+	memoryService   MemoryService
+}
+
+func NewMemoryRetriever(embeddingClient EmbeddingClient, milvusStore VectorStore, memoryService MemoryService) *MemoryRetriever {
 	return &MemoryRetriever{
 		embeddingClient: embeddingClient,
 		milvusStore:     milvusStore,

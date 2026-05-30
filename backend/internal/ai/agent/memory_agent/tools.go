@@ -8,6 +8,7 @@ import (
 	"memoryflow/internal/ai/component/retriever"
 	"memoryflow/internal/ai/pipeline/memory_chat"
 	"memoryflow/internal/domain/model"
+	"memoryflow/internal/domain/service"
 )
 
 type ToolName string
@@ -42,6 +43,19 @@ type RecentMemoryInput struct {
 type TimelineInput struct {
 	Start time.Time
 	End   time.Time
+}
+
+type ChatPipeline interface {
+	Run(ctx context.Context, input memory_chat.ChatInput) (*memory_chat.ChatOutput, error)
+}
+
+type MemoryRetriever interface {
+	Retrieve(ctx context.Context, query string, opt retriever.RetrieveOptions) ([]retriever.RetrievedMemory, error)
+}
+
+type MemoryService interface {
+	ListRecent(ctx context.Context, limit int) ([]model.MemoryItem, error)
+	GetTimeline(ctx context.Context, start, end time.Time) ([]service.TimelineGroup, error)
 }
 
 func (a *MemoryAgent) AskMemory(ctx context.Context, input AskMemoryInput) (*memory_chat.ChatOutput, error) {

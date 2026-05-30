@@ -3,17 +3,25 @@ package memory_index
 import (
 	"context"
 
-	"memoryflow/internal/domain/service"
+	"memoryflow/internal/domain/model"
 )
 
 type Pipeline struct {
-	memoryService *service.MemoryService
-	indexer       *Indexer
+	memoryService MemoryService
+	indexer       DocumentIndexer
+}
+
+type MemoryService interface {
+	ListForIndex(ctx context.Context, limit int, offset int) ([]model.MemoryItem, error)
+}
+
+type DocumentIndexer interface {
+	Index(ctx context.Context, doc IndexDocument) error
 }
 
 func NewPipeline(
-	memoryService *service.MemoryService,
-	indexer *Indexer,
+	memoryService MemoryService,
+	indexer DocumentIndexer,
 ) *Pipeline {
 	return &Pipeline{
 		memoryService: memoryService,

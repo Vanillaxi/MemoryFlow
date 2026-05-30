@@ -6,22 +6,29 @@ import (
 
 	"github.com/cloudwego/eino/compose"
 
-	"memoryflow/internal/ai/component/reranker"
 	"memoryflow/internal/ai/component/retriever"
 )
 
 type Pipeline struct {
-	memoryRetriever *retriever.MemoryRetriever
-	memoryReranker  *reranker.MemoryReranker
+	memoryRetriever MemoryRetriever
+	memoryReranker  MemoryReranker
 	chatModel       ChatModel
 
 	runnable compose.Runnable[ChatInput, *ChatOutput]
 }
 
+type MemoryRetriever interface {
+	Retrieve(ctx context.Context, query string, opt retriever.RetrieveOptions) ([]retriever.RetrievedMemory, error)
+}
+
+type MemoryReranker interface {
+	Rerank(query string, memories []retriever.RetrievedMemory, topK int) []retriever.RetrievedMemory
+}
+
 func NewPipeline(
 	ctx context.Context,
-	memoryRetriever *retriever.MemoryRetriever,
-	memoryReranker *reranker.MemoryReranker,
+	memoryRetriever MemoryRetriever,
+	memoryReranker MemoryReranker,
 	chatModel ChatModel,
 ) (*Pipeline, error) {
 	p := &Pipeline{
