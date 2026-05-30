@@ -14,6 +14,7 @@ type MemoryRepository interface {
 	FindByIDs(ctx context.Context, ids []uint) ([]model.MemoryItem, error)
 	FindRecent(ctx context.Context, limit int) ([]model.MemoryItem, error)
 	FindByTimeRange(ctx context.Context, start, end time.Time, limit int) ([]model.MemoryItem, error)
+	ListByTimeRange(ctx context.Context, from, to time.Time, limit int) ([]*model.MemoryItem, error)
 	UpdateAnalysis(ctx context.Context, id uint, summary string, tags string, mood string, importanceScore float64) error
 	ListForIndex(ctx context.Context, limit int, offset int) ([]model.MemoryItem, error)
 }
@@ -57,6 +58,22 @@ func (r *SQLiteMemoryRepository) FindByTimeRange(ctx context.Context, start, end
 		Where("deleted_at IS NULL").
 		Where("created_at >= ? AND created_at < ?", start, end).
 		Order("created_at DESC").
+		Limit(limit).
+		Find(&items).Error
+	return items, err
+}
+
+// ListByTimeRange returns fact records ordered by occurrence time from oldest to newest.
+func (r *SQLiteMemoryRepository) ListByTimeRange(ctx context.Context, from, to time.Time, limit int) ([]*model.MemoryItem, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+
+	var items []*model.MemoryItem
+	err := r.db.WithContext(ctx).
+		Where("deleted_at IS NULL").
+		Where("occurred_at >= ? AND occurred_at <= ?", from, to).
+		Order("occurred_at ASC").
 		Limit(limit).
 		Find(&items).Error
 	return items, err

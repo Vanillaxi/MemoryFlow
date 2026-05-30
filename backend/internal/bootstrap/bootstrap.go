@@ -12,6 +12,7 @@ import (
 	"memoryflow/internal/ai/component/vectorstore"
 	"memoryflow/internal/ai/pipeline/memory_chat"
 	"memoryflow/internal/ai/pipeline/memory_index"
+	"memoryflow/internal/ai/pipeline/memory_summary"
 	"memoryflow/internal/ai/workflow/image_analyze"
 	"memoryflow/internal/ai/workflow/text_analyze"
 	"memoryflow/internal/config"
@@ -40,9 +41,10 @@ type App struct {
 	MemoryRetriever *retriever.MemoryRetriever
 	MemoryReranker  *reranker.MemoryReranker
 
-	MemoryChatPipeline  *memory_chat.Pipeline
-	MemoryIndexPipeline *memory_index.Pipeline
-	MemoryAgent         *memory_agent.MemoryAgent
+	MemoryChatPipeline    *memory_chat.Pipeline
+	MemoryIndexPipeline   *memory_index.Pipeline
+	MemorySummaryPipeline *memory_summary.Pipeline
+	MemoryAgent           *memory_agent.MemoryAgent
 
 	Storage *storage.LocalStorage
 	Worker  *task.Worker
@@ -129,6 +131,8 @@ func NewApp(ctx context.Context) (*App, error) {
 		),
 	)
 
+	memorySummaryPipeline := memory_summary.NewPipeline(memoryService, analysisChatModel)
+
 	memoryAgent, err := memory_agent.NewMemoryAgent(
 		ctx,
 		memoryChatPipeline,
@@ -169,9 +173,10 @@ func NewApp(ctx context.Context) (*App, error) {
 		MemoryRetriever: memoryRetriever,
 		MemoryReranker:  memoryReranker,
 
-		MemoryChatPipeline:  memoryChatPipeline,
-		MemoryIndexPipeline: memoryIndexPipeline,
-		MemoryAgent:         memoryAgent,
+		MemoryChatPipeline:    memoryChatPipeline,
+		MemoryIndexPipeline:   memoryIndexPipeline,
+		MemorySummaryPipeline: memorySummaryPipeline,
+		MemoryAgent:           memoryAgent,
 
 		Storage: localStorage,
 		Worker:  worker,

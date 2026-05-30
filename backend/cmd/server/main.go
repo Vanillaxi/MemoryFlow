@@ -29,6 +29,7 @@ func main() {
 		app.MemoryRetriever,
 		app.MemoryAgent,
 		app.MemoryIndexPipeline,
+		app.MemorySummaryPipeline,
 	)
 	taskHandler := api.NewTaskHandler(app.TaskService)
 

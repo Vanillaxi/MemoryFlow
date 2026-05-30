@@ -4,6 +4,7 @@ import (
 	"memoryflow/internal/ai/agent/memory_agent"
 	"memoryflow/internal/ai/component/retriever"
 	"memoryflow/internal/ai/pipeline/memory_index"
+	"memoryflow/internal/ai/pipeline/memory_summary"
 	"memoryflow/internal/domain/service"
 	"memoryflow/internal/pkg/response"
 	"memoryflow/internal/storage"
@@ -16,12 +17,13 @@ import (
 )
 
 type MemoryHandler struct {
-	memoryService       *service.MemoryService
-	taskService         *service.TaskService
-	storage             *storage.LocalStorage
-	memoryRetriever     *retriever.MemoryRetriever
-	memoryAgent         *memory_agent.MemoryAgent
-	memoryIndexPipeline *memory_index.Pipeline
+	memoryService         *service.MemoryService
+	taskService           *service.TaskService
+	storage               *storage.LocalStorage
+	memoryRetriever       *retriever.MemoryRetriever
+	memoryAgent           *memory_agent.MemoryAgent
+	memoryIndexPipeline   *memory_index.Pipeline
+	memorySummaryPipeline *memory_summary.Pipeline
 }
 
 func NewMemoryHandler(
@@ -31,14 +33,16 @@ func NewMemoryHandler(
 	memoryRetriever *retriever.MemoryRetriever,
 	memoryAgent *memory_agent.MemoryAgent,
 	memoryIndexPipeline *memory_index.Pipeline,
+	memorySummaryPipeline *memory_summary.Pipeline,
 ) *MemoryHandler {
 	return &MemoryHandler{
-		memoryService:       memoryService,
-		taskService:         taskService,
-		storage:             storage,
-		memoryRetriever:     memoryRetriever,
-		memoryAgent:         memoryAgent,
-		memoryIndexPipeline: memoryIndexPipeline,
+		memoryService:         memoryService,
+		taskService:           taskService,
+		storage:               storage,
+		memoryRetriever:       memoryRetriever,
+		memoryAgent:           memoryAgent,
+		memoryIndexPipeline:   memoryIndexPipeline,
+		memorySummaryPipeline: memorySummaryPipeline,
 	}
 }
 
@@ -171,6 +175,45 @@ func (h *MemoryHandler) GetTimeline(c *gin.Context) {
 
 	response.OK(c, groups)
 
+}
+
+func (h *MemoryHandler) SummarizeMemories(c *gin.Context) {
+	fromStr := strings.TrimSpace(c.Query("from"))
+	toStr := strings.TrimSpace(c.Query("to"))
+	if fromStr == "" || toStr == "" {
+		response.Error(c, http.StatusBadRequest, "from and to are required, expected YYYY-MM-DD")
+		return
+	}
+
+	from, err := time.Parse("2006-01-02", fromStr)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "invalid from format, expected YYYY-MM-DD")
+		return
+	}
+	to, err := time.Parse("2006-01-02", toStr)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "invalid to format, expected YYYY-MM-DD")
+		return
+	}
+	to = to.Add(24*time.Hour - time.Second)
+
+	limit := 100
+	if limitStr := strings.TrimSpace(c.Query("limit")); limitStr != "" {
+		if parsed, err := strconv.Atoi(limitStr); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+
+	output, err := h.memorySummaryPipeline.Invoke(c.Request.Context(), memory_summary.SummaryInput{
+		From:  from,
+		To:    to,
+		Limit: limit,
+	})
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	response.OK(c, output)
 }
 
 func (h *MemoryHandler) SearchMemories(c *gin.Context) {

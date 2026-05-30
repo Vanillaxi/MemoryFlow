@@ -85,6 +85,10 @@ func (s *MemoryService) ListRecent(ctx context.Context, limit int) ([]model.Memo
 	return s.repo.FindRecent(ctx, limit)
 }
 
+func (s *MemoryService) ListByTimeRange(ctx context.Context, from, to time.Time, limit int) ([]*model.MemoryItem, error) {
+	return s.repo.ListByTimeRange(ctx, from, to, limit)
+}
+
 // 时间线默认从新到旧
 func (s *MemoryService) GetTimeline(ctx context.Context, start, end time.Time) ([]TimelineGroup, error) {
 	items, err := s.repo.FindByTimeRange(ctx, start, end, 500)
