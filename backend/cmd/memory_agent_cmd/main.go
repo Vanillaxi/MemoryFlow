@@ -8,11 +8,11 @@ import (
 	"log"
 	"strings"
 
-	"memoryflow/internal/ai/agent/memory_agent"
+	"memoryflow/internal/ai/agent/memory_react_agent"
 	"memoryflow/internal/bootstrap"
 )
 
-const defaultQuestion = "最近我记录了什么？"
+const defaultQuestion = "最近一周我记录了什么？"
 
 func main() {
 	ctx := context.Background()
@@ -30,7 +30,7 @@ func main() {
 	}
 	defer app.Close(ctx)
 
-	output, err := app.MemoryAgent.Invoke(ctx, memory_agent.AgentInput{
+	output, err := app.MemoryAgent.Invoke(ctx, memory_react_agent.AgentInput{
 		Message: question,
 		TopK:    20,
 		Debug:   *debug,

@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"memoryflow/internal/ai/pipeline/memory_chat"
+	"memoryflow/internal/ai/agent/memory_chat_pipeline"
 	"memoryflow/internal/bootstrap"
 )
 
@@ -27,7 +27,7 @@ func main() {
 	}
 	defer app.Close(ctx)
 
-	output, err := app.MemoryChatPipeline.Run(ctx, memory_chat.ChatInput{
+	output, err := app.MemoryChatPipeline.Run(ctx, memory_chat_pipeline.ChatInput{
 		Question: question,
 		TopK:     20,
 	})

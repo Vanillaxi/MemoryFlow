@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"memoryflow/internal/ai/pipeline/memory_index"
+	"memoryflow/internal/ai/agent/memory_index_pipeline"
 	"memoryflow/internal/bootstrap"
 )
 
@@ -25,7 +25,7 @@ func main() {
 	}
 	defer app.Close(ctx)
 
-	output, err := app.MemoryIndexPipeline.ReindexAll(ctx, memory_index.ReindexInput{
+	output, err := app.MemoryIndexPipeline.ReindexAll(ctx, memory_index_pipeline.ReindexInput{
 		BatchSize: batchSize,
 	})
 	if err != nil {

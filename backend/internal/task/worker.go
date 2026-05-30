@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
-	"memoryflow/internal/ai/component/embedding"
-	"memoryflow/internal/ai/component/vectorstore"
+	"memoryflow/internal/ai/embedder"
+	"memoryflow/internal/ai/vectorstore"
 	"memoryflow/internal/ai/workflow/image_analyze"
 	"memoryflow/internal/ai/workflow/text_analyze"
 	"memoryflow/internal/domain/model"
@@ -20,7 +20,7 @@ type Worker struct {
 	memoryService        *service.MemoryService
 	textAnalyzeWorkflow  *text_analyze.Workflow
 	imageAnalyzeWorkflow *image_analyze.Workflow
-	embeddingClient      *embedding.Client
+	embeddingClient      *embedder.Client
 	milvusStore          *vectorstore.MilvusStore
 	interval             time.Duration
 }
@@ -30,7 +30,7 @@ func NewWorker(
 	memoryService *service.MemoryService,
 	textAnalyzeWorkflow *text_analyze.Workflow,
 	imageAnalyzeWorkflow *image_analyze.Workflow,
-	embeddingClient *embedding.Client,
+	embeddingClient *embedder.Client,
 	milvusStore *vectorstore.MilvusStore,
 ) *Worker {
 	return &Worker{

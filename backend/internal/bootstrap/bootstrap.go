@@ -4,15 +4,17 @@ import (
 	"context"
 	"log"
 
-	"memoryflow/internal/ai/agent/memory_agent"
-	"memoryflow/internal/ai/component/chatmodel"
-	"memoryflow/internal/ai/component/embedding"
-	"memoryflow/internal/ai/component/reranker"
-	"memoryflow/internal/ai/component/retriever"
-	"memoryflow/internal/ai/component/vectorstore"
-	"memoryflow/internal/ai/pipeline/memory_chat"
-	"memoryflow/internal/ai/pipeline/memory_index"
-	"memoryflow/internal/ai/pipeline/memory_summary"
+	"memoryflow/internal/ai/agent/memory_chat_pipeline"
+	"memoryflow/internal/ai/agent/memory_index_pipeline"
+	"memoryflow/internal/ai/agent/memory_react_agent"
+	"memoryflow/internal/ai/agent/memory_summary_pipeline"
+	"memoryflow/internal/ai/embedder"
+	"memoryflow/internal/ai/indexer"
+	"memoryflow/internal/ai/loader"
+	"memoryflow/internal/ai/models"
+	"memoryflow/internal/ai/reranker"
+	"memoryflow/internal/ai/retriever"
+	"memoryflow/internal/ai/vectorstore"
 	"memoryflow/internal/ai/workflow/image_analyze"
 	"memoryflow/internal/ai/workflow/text_analyze"
 	"memoryflow/internal/config"
@@ -30,21 +32,21 @@ type App struct {
 	MemoryService *service.MemoryService
 	TaskService   *service.TaskService
 
-	AnalysisChatModel *chatmodel.ChatModel
-	EinoChatModel     *chatmodel.ArkEinoChatModel
+	AnalysisChatModel *models.ChatModel
+	EinoChatModel     *models.ArkEinoChatModel
 
 	TextAnalyzeWorkflow  *text_analyze.Workflow
 	ImageAnalyzeWorkflow *image_analyze.Workflow
 
 	MilvusStore     *vectorstore.MilvusStore
-	EmbeddingClient *embedding.Client
+	EmbeddingClient *embedder.Client
 	MemoryRetriever *retriever.MemoryRetriever
 	MemoryReranker  *reranker.MemoryReranker
 
-	MemoryChatPipeline    *memory_chat.Pipeline
-	MemoryIndexPipeline   *memory_index.Pipeline
-	MemorySummaryPipeline *memory_summary.Pipeline
-	MemoryAgent           *memory_agent.MemoryAgent
+	MemoryChatPipeline    *memory_chat_pipeline.Pipeline
+	MemoryIndexPipeline   *memory_index_pipeline.Pipeline
+	MemorySummaryPipeline *memory_summary_pipeline.Pipeline
+	MemoryAgent           *memory_react_agent.MemoryAgent
 
 	Storage *storage.LocalStorage
 	Worker  *task.Worker
@@ -67,13 +69,13 @@ func NewApp(ctx context.Context) (*App, error) {
 	taskRepo := repository.NewSQLiteTaskRepository(db)
 	taskService := service.NewTaskService(taskRepo)
 
-	analysisChatModel := chatmodel.NewChatModel(
+	analysisChatModel := models.NewChatModel(
 		cfg.Model.BaseURL,
 		cfg.Model.APIKey,
 		cfg.Model.ModelName,
 	)
 
-	einoChatModel := chatmodel.NewArkEinoChatModel(chatmodel.Config{
+	einoChatModel := models.NewArkEinoChatModel(models.Config{
 		BaseURL:   cfg.Model.BaseURL,
 		APIKey:    cfg.Model.APIKey,
 		ModelName: cfg.Model.ModelName,
@@ -97,7 +99,7 @@ func NewApp(ctx context.Context) (*App, error) {
 		return nil, err
 	}
 
-	embeddingClient := embedding.NewClient(
+	embeddingClient := embedder.NewClient(
 		cfg.Embedding.BaseURL,
 		cfg.Embedding.APIKey,
 		cfg.Embedding.ModelName,
@@ -112,7 +114,7 @@ func NewApp(ctx context.Context) (*App, error) {
 
 	memoryReranker := reranker.NewMemoryReranker()
 
-	memoryChatPipeline, err := memory_chat.NewPipeline(
+	memoryChatPipeline, err := memory_chat_pipeline.NewPipeline(
 		ctx,
 		memoryRetriever,
 		memoryReranker,
@@ -123,21 +125,22 @@ func NewApp(ctx context.Context) (*App, error) {
 		return nil, err
 	}
 
-	memoryIndexPipeline := memory_index.NewPipeline(
-		memoryService,
-		memory_index.NewIndexer(
+	memoryIndexPipeline := memory_index_pipeline.NewPipeline(
+		loader.NewMemoryLoader(memoryService),
+		indexer.NewMemoryIndexer(
 			embeddingClient,
 			milvusStore,
 		),
 	)
 
-	memorySummaryPipeline := memory_summary.NewPipeline(memoryService, analysisChatModel)
+	memorySummaryPipeline := memory_summary_pipeline.NewPipeline(memoryService, analysisChatModel)
 
-	memoryAgent, err := memory_agent.NewMemoryAgent(
+	memoryAgent, err := memory_react_agent.NewMemoryAgent(
 		ctx,
 		memoryChatPipeline,
 		memoryRetriever,
 		memoryService,
+		memorySummaryPipeline,
 		einoChatModel,
 	)
 	if err != nil {

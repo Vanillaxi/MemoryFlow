@@ -41,8 +41,14 @@ if [[ "${RUN_AI:-0}" == "1" ]]; then
   section "Smoke test: memory_chat_cmd"
   go run ./cmd/memory_chat_cmd "我最近在做什么项目"
 
-  section "Smoke test: memory_agent_cmd debug trace"
-  go run ./cmd/memory_agent_cmd --debug "最近我记录了什么"
+  section "Smoke test: memory_agent_cmd recent week debug trace"
+  go run ./cmd/memory_agent_cmd --debug "最近一周我记录了什么"
+
+  section "Smoke test: memory_agent_cmd aggregate debug trace"
+  go run ./cmd/memory_agent_cmd --debug "总结一下五月份我主要做了什么"
+
+  section "Smoke test: memory_agent_cmd evidence debug trace"
+  go run ./cmd/memory_agent_cmd --debug "和 Eino 有关的记忆有哪些"
 
   section "Smoke test: memory_summary_cmd"
   go run ./cmd/memory_summary_cmd --from=2026-05-01 --to=2026-05-31
