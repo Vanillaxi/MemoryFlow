@@ -37,12 +37,12 @@ func TestGetMemoryDetailValidatesMemoryID(t *testing.T) {
 	}
 }
 
-func TestQueryLongTermMemoryEinoToolEmitsTrace(t *testing.T) {
+func TestQueryLongTermMemoryToolEmitsTrace(t *testing.T) {
 	var events []string
 	trace := func(_ context.Context, name string, event string, _ any, _ any, _ error) {
 		events = append(events, name+":"+event)
 	}
-	currentTool := NewQueryLongTermMemoryEinoTool(&fakeRetriever{}, &fakeMemoryService{}, trace)
+	currentTool := NewQueryLongTermMemoryTool(&fakeRetriever{}, &fakeMemoryService{}, trace)
 	if _, err := currentTool.InvokableRun(context.Background(), `{"query":"Eino","mode":"semantic"}`); err != nil {
 		t.Fatal(err)
 	}

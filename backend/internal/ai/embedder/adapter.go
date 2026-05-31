@@ -6,17 +6,17 @@ import (
 	einoembedding "github.com/cloudwego/eino/components/embedding"
 )
 
-var _ einoembedding.Embedder = (*EinoAdapter)(nil)
+var _ einoembedding.Embedder = (*EmbedderAdapter)(nil)
 
-type EinoAdapter struct {
+type EmbedderAdapter struct {
 	client *Client
 }
 
-func NewEinoAdapter(client *Client) *EinoAdapter {
-	return &EinoAdapter{client: client}
+func NewEmbedderAdapter(client *Client) *EmbedderAdapter {
+	return &EmbedderAdapter{client: client}
 }
 
-func (a *EinoAdapter) EmbedStrings(ctx context.Context, texts []string, _ ...einoembedding.Option) ([][]float64, error) {
+func (a *EmbedderAdapter) EmbedStrings(ctx context.Context, texts []string, _ ...einoembedding.Option) ([][]float64, error) {
 	embeddings := make([][]float64, 0, len(texts))
 	for _, text := range texts {
 		vector, err := a.client.Embed(ctx, text)

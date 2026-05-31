@@ -28,8 +28,8 @@ type App struct {
 	MemoryService *service.MemoryService
 	TaskService   *service.TaskService
 
-	AnalysisChatModel *models.ChatModel
-	EinoChatModel     *models.ArkEinoChatModel
+	AnalysisChatModel    *models.ChatModel
+	ToolCallingChatModel *models.ArkToolCallingChatModel
 
 	TextAnalyzeWorkflow  *text_analyze.Workflow
 	ImageAnalyzeWorkflow *image_analyze.Workflow
@@ -69,7 +69,7 @@ func NewApp(ctx context.Context) (*App, error) {
 		cfg.Model.ModelName,
 	)
 
-	einoChatModel := chat_pipeline.NewModel(models.Config{
+	toolCallingChatModel := chat_pipeline.NewModel(models.Config{
 		BaseURL:   cfg.Model.BaseURL,
 		APIKey:    cfg.Model.APIKey,
 		ModelName: cfg.Model.ModelName,
@@ -121,7 +121,7 @@ func NewApp(ctx context.Context) (*App, error) {
 		memoryRetriever,
 		memoryService,
 		analysisChatModel,
-		einoChatModel,
+		toolCallingChatModel,
 	)
 	if err != nil {
 		_ = milvusStore.Close(ctx)
@@ -145,8 +145,8 @@ func NewApp(ctx context.Context) (*App, error) {
 		MemoryService: memoryService,
 		TaskService:   taskService,
 
-		AnalysisChatModel: analysisChatModel,
-		EinoChatModel:     einoChatModel,
+		AnalysisChatModel:    analysisChatModel,
+		ToolCallingChatModel: toolCallingChatModel,
 
 		TextAnalyzeWorkflow:  textAnalyzeWorkflow,
 		ImageAnalyzeWorkflow: imageAnalyzeWorkflow,

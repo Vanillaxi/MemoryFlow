@@ -11,13 +11,13 @@ import (
 
 func (p *Pipeline) BaseTools() []tool.BaseTool {
 	return []tool.BaseTool{
-		memorytools.NewGetCurrentTimeEinoTool(traceExternalTool),
-		memorytools.NewQueryLongTermMemoryEinoTool(p.memoryRetriever, p.memoryService, traceExternalTool),
-		memorytools.NewGetMemoryDetailEinoTool(p.memoryService, traceExternalTool),
+		memorytools.NewGetCurrentTimeTool(traceExternalTool),
+		memorytools.NewQueryLongTermMemoryTool(p.memoryRetriever, p.memoryService, traceExternalTool),
+		memorytools.NewGetMemoryDetailTool(p.memoryService, traceExternalTool),
 	}
 }
 
-func (p *Pipeline) DebugListEinoTools(ctx context.Context) ([]*schema.ToolInfo, error) {
+func (p *Pipeline) DebugListTools(ctx context.Context) ([]*schema.ToolInfo, error) {
 	tools := p.BaseTools()
 	infos := make([]*schema.ToolInfo, 0, len(tools))
 	for _, currentTool := range tools {

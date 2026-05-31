@@ -15,10 +15,10 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
-var _ model.ChatModel = (*ArkEinoChatModel)(nil)
-var _ model.ToolCallingChatModel = (*ArkEinoChatModel)(nil)
+var _ model.ChatModel = (*ArkToolCallingChatModel)(nil)
+var _ model.ToolCallingChatModel = (*ArkToolCallingChatModel)(nil)
 
-type ArkEinoChatModel struct {
+type ArkToolCallingChatModel struct {
 	baseURL   string
 	apiKey    string
 	modelName string
@@ -28,13 +28,13 @@ type ArkEinoChatModel struct {
 	tools []*schema.ToolInfo
 }
 
-func NewArkEinoChatModel(cfg Config) *ArkEinoChatModel {
+func NewArkToolCallingChatModel(cfg Config) *ArkToolCallingChatModel {
 	client := &http.Client{}
 	if cfg.HTTPTimeout > 0 {
 		client.Timeout = cfg.HTTPTimeout
 	}
 
-	return &ArkEinoChatModel{
+	return &ArkToolCallingChatModel{
 		baseURL:   strings.TrimRight(cfg.BaseURL, "/"),
 		apiKey:    cfg.APIKey,
 		modelName: cfg.ModelName,
@@ -42,7 +42,7 @@ func NewArkEinoChatModel(cfg Config) *ArkEinoChatModel {
 	}
 }
 
-func (m *ArkEinoChatModel) Generate(ctx context.Context, msgs []*schema.Message, opts ...model.Option) (*schema.Message, error) {
+func (m *ArkToolCallingChatModel) Generate(ctx context.Context, msgs []*schema.Message, opts ...model.Option) (*schema.Message, error) {
 	req, err := m.buildChatCompletionRequest(msgs, opts...)
 	if err != nil {
 		return nil, err
@@ -56,11 +56,11 @@ func (m *ArkEinoChatModel) Generate(ctx context.Context, msgs []*schema.Message,
 	return toEinoMessage(resp)
 }
 
-func (m *ArkEinoChatModel) Stream(ctx context.Context, msgs []*schema.Message, opts ...model.Option) (*schema.StreamReader[*schema.Message], error) {
-	return nil, errors.New("ArkEinoChatModel Stream is not implemented")
+func (m *ArkToolCallingChatModel) Stream(ctx context.Context, msgs []*schema.Message, opts ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+	return nil, errors.New("ArkToolCallingChatModel Stream is not implemented")
 }
 
-func (m *ArkEinoChatModel) BindTools(tools []*schema.ToolInfo) error {
+func (m *ArkToolCallingChatModel) BindTools(tools []*schema.ToolInfo) error {
 	if len(tools) == 0 {
 		return errors.New("no tools to bind")
 	}
@@ -75,7 +75,7 @@ func (m *ArkEinoChatModel) BindTools(tools []*schema.ToolInfo) error {
 	return nil
 }
 
-func (m *ArkEinoChatModel) WithTools(tools []*schema.ToolInfo) (model.ToolCallingChatModel, error) {
+func (m *ArkToolCallingChatModel) WithTools(tools []*schema.ToolInfo) (model.ToolCallingChatModel, error) {
 	if len(tools) == 0 {
 		return nil, errors.New("no tools to bind")
 	}
@@ -83,7 +83,7 @@ func (m *ArkEinoChatModel) WithTools(tools []*schema.ToolInfo) (model.ToolCallin
 	copiedTools := make([]*schema.ToolInfo, len(tools))
 	copy(copiedTools, tools)
 
-	return &ArkEinoChatModel{
+	return &ArkToolCallingChatModel{
 		baseURL:   m.baseURL,
 		apiKey:    m.apiKey,
 		modelName: m.modelName,
@@ -92,7 +92,7 @@ func (m *ArkEinoChatModel) WithTools(tools []*schema.ToolInfo) (model.ToolCallin
 	}, nil
 }
 
-func (m *ArkEinoChatModel) buildChatCompletionRequest(msgs []*schema.Message, opts ...model.Option) (*chatCompletionRequest, error) {
+func (m *ArkToolCallingChatModel) buildChatCompletionRequest(msgs []*schema.Message, opts ...model.Option) (*chatCompletionRequest, error) {
 	if m.baseURL == "" {
 		return nil, errors.New("ark base url is required")
 	}
@@ -167,7 +167,7 @@ func (m *ArkEinoChatModel) buildChatCompletionRequest(msgs []*schema.Message, op
 	return req, nil
 }
 
-func (m *ArkEinoChatModel) doChatCompletion(ctx context.Context, reqBody *chatCompletionRequest) (*chatCompletionResponse, error) {
+func (m *ArkToolCallingChatModel) doChatCompletion(ctx context.Context, reqBody *chatCompletionRequest) (*chatCompletionResponse, error) {
 	bodyBytes, err := json.Marshal(reqBody)
 	if err != nil {
 		return nil, err

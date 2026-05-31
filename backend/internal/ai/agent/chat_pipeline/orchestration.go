@@ -10,7 +10,7 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
-func newEinoReactAgent(
+func newReactAgent(
 	ctx context.Context,
 	toolCallingModel model.ToolCallingChatModel,
 	tools []tool.BaseTool,

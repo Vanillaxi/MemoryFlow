@@ -11,30 +11,30 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
-type EinoTraceHandler struct {
+type TraceHandler struct {
 	collector *TraceCollector
 }
 
-func NewEinoTraceHandler(collector *TraceCollector) *EinoTraceHandler {
-	return &EinoTraceHandler{collector: collector}
+func NewTraceHandler(collector *TraceCollector) *TraceHandler {
+	return &TraceHandler{collector: collector}
 }
 
-func (h *EinoTraceHandler) OnStart(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {
+func (h *TraceHandler) OnStart(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {
 	h.record(info, "start", input, nil, nil)
 	return ctx
 }
 
-func (h *EinoTraceHandler) OnEnd(ctx context.Context, info *callbacks.RunInfo, output callbacks.CallbackOutput) context.Context {
+func (h *TraceHandler) OnEnd(ctx context.Context, info *callbacks.RunInfo, output callbacks.CallbackOutput) context.Context {
 	h.record(info, "end", nil, output, nil)
 	return ctx
 }
 
-func (h *EinoTraceHandler) OnError(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
+func (h *TraceHandler) OnError(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
 	h.record(info, "error", nil, nil, err)
 	return ctx
 }
 
-func (h *EinoTraceHandler) OnStartWithStreamInput(ctx context.Context, info *callbacks.RunInfo, input *schema.StreamReader[callbacks.CallbackInput]) context.Context {
+func (h *TraceHandler) OnStartWithStreamInput(ctx context.Context, info *callbacks.RunInfo, input *schema.StreamReader[callbacks.CallbackInput]) context.Context {
 	if input != nil {
 		input.Close()
 	}
@@ -42,7 +42,7 @@ func (h *EinoTraceHandler) OnStartWithStreamInput(ctx context.Context, info *cal
 	return ctx
 }
 
-func (h *EinoTraceHandler) OnEndWithStreamOutput(ctx context.Context, info *callbacks.RunInfo, output *schema.StreamReader[callbacks.CallbackOutput]) context.Context {
+func (h *TraceHandler) OnEndWithStreamOutput(ctx context.Context, info *callbacks.RunInfo, output *schema.StreamReader[callbacks.CallbackOutput]) context.Context {
 	if output != nil {
 		output.Close()
 	}
@@ -50,11 +50,11 @@ func (h *EinoTraceHandler) OnEndWithStreamOutput(ctx context.Context, info *call
 	return ctx
 }
 
-func (h *EinoTraceHandler) Needed(context.Context, *callbacks.RunInfo, callbacks.CallbackTiming) bool {
+func (h *TraceHandler) Needed(context.Context, *callbacks.RunInfo, callbacks.CallbackTiming) bool {
 	return h != nil && h.collector != nil
 }
 
-func (h *EinoTraceHandler) record(info *callbacks.RunInfo, phase string, input callbacks.CallbackInput, output callbacks.CallbackOutput, err error) {
+func (h *TraceHandler) record(info *callbacks.RunInfo, phase string, input callbacks.CallbackInput, output callbacks.CallbackOutput, err error) {
 	if h == nil || h.collector == nil {
 		return
 	}

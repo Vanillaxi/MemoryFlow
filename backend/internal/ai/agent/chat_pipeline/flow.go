@@ -34,7 +34,7 @@ func NewPipeline(
 		chatModel:       chatModel,
 	}
 
-	reactAgent, err := newEinoReactAgent(
+	reactAgent, err := newReactAgent(
 		ctx,
 		toolCallingModel,
 		p.BaseTools(),
@@ -70,14 +70,14 @@ func (p *Pipeline) Invoke(ctx context.Context, input ChatInput) (*ChatOutput, er
 
 	if collector != nil {
 		ctx = ContextWithTraceCollector(ctx, collector)
-		opts = append(opts, einoagent.WithComposeOptions(compose.WithCallbacks(NewEinoTraceHandler(collector))))
-		collector.Start("EinoReactAgent.Generate", traceInvokeInput(input))
+		opts = append(opts, einoagent.WithComposeOptions(compose.WithCallbacks(NewTraceHandler(collector))))
+		collector.Start("ReactAgent.Generate", traceInvokeInput(input))
 	}
 
 	result, err := p.reactAgent.Generate(ctx, []*schema.Message{msg}, opts...)
 	if err != nil {
 		if collector != nil {
-			collector.Error("EinoReactAgent.Generate", err)
+			collector.Error("ReactAgent.Generate", err)
 			collector.Error("ChatPipeline.Invoke", err)
 			return &ChatOutput{
 				Intent: "eino_react",
@@ -87,7 +87,7 @@ func (p *Pipeline) Invoke(ctx context.Context, input ChatInput) (*ChatOutput, er
 		return nil, err
 	}
 	if collector != nil {
-		collector.End("EinoReactAgent.Generate", traceAnswerOutput(result.Content))
+		collector.End("ReactAgent.Generate", traceAnswerOutput(result.Content))
 	}
 
 	output := &ChatOutput{

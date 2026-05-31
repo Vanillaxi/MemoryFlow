@@ -38,7 +38,7 @@ func TestGenerate(t *testing.T) {
 	}))
 	defer server.Close()
 
-	model := NewArkEinoChatModel(Config{
+	model := NewArkToolCallingChatModel(Config{
 		BaseURL:   server.URL,
 		APIKey:    "dummy_api_key",
 		ModelName: "test-model",
@@ -65,7 +65,7 @@ func TestGenerate(t *testing.T) {
 }
 
 func TestBindTools(t *testing.T) {
-	model := NewArkEinoChatModel(Config{
+	model := NewArkToolCallingChatModel(Config{
 		BaseURL:   "http://localhost:8080",
 		APIKey:    "dummy_api_key",
 		ModelName: "test-model",

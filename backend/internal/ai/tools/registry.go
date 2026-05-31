@@ -17,7 +17,7 @@ const (
 
 type TraceEvent func(ctx context.Context, name string, event string, input any, output any, err error)
 
-type EinoTool struct {
+type RegisteredTool struct {
 	name       string
 	desc       string
 	parameters map[string]*schema.ParameterInfo
@@ -25,7 +25,7 @@ type EinoTool struct {
 	trace      TraceEvent
 }
 
-func (t *EinoTool) Info(context.Context) (*schema.ToolInfo, error) {
+func (t *RegisteredTool) Info(context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
 		Name:        t.name,
 		Desc:        t.desc,
@@ -33,7 +33,7 @@ func (t *EinoTool) Info(context.Context) (*schema.ToolInfo, error) {
 	}, nil
 }
 
-func (t *EinoTool) InvokableRun(ctx context.Context, argumentsInJSON string, _ ...tool.Option) (string, error) {
+func (t *RegisteredTool) InvokableRun(ctx context.Context, argumentsInJSON string, _ ...tool.Option) (string, error) {
 	t.emit(ctx, "tool_start", map[string]any{"arguments": argumentsInJSON}, nil, nil)
 
 	var args map[string]any
@@ -60,14 +60,14 @@ func (t *EinoTool) InvokableRun(ctx context.Context, argumentsInJSON string, _ .
 	return output, nil
 }
 
-func (t *EinoTool) emit(ctx context.Context, event string, input any, output any, err error) {
+func (t *RegisteredTool) emit(ctx context.Context, event string, input any, output any, err error) {
 	if t.trace != nil {
 		t.trace(ctx, t.name, event, input, output, err)
 	}
 }
 
-func NewGetCurrentTimeEinoTool(trace TraceEvent) *EinoTool {
-	return &EinoTool{
+func NewGetCurrentTimeTool(trace TraceEvent) *RegisteredTool {
+	return &RegisteredTool{
 		name:       ToolGetCurrentTime,
 		desc:       "获取当前时间、日期和时区。解析今天、昨天、最近一周、本月等相对时间前先调用此工具。",
 		parameters: map[string]*schema.ParameterInfo{},
@@ -78,8 +78,8 @@ func NewGetCurrentTimeEinoTool(trace TraceEvent) *EinoTool {
 	}
 }
 
-func NewQueryLongTermMemoryEinoTool(memoryRetriever MemoryRetriever, memoryService MemoryService, trace TraceEvent) *EinoTool {
-	return &EinoTool{
+func NewQueryLongTermMemoryTool(memoryRetriever MemoryRetriever, memoryService MemoryService, trace TraceEvent) *RegisteredTool {
+	return &RegisteredTool{
 		name: ToolQueryLongTermMemory,
 		desc: "自然语言查询用户长期记忆库。semantic 用于语义检索相关证据；timeline 用于按时间查看记忆列表；aggregate 用于按时间聚合标签、情绪和重点候选。",
 		parameters: map[string]*schema.ParameterInfo{
@@ -102,8 +102,8 @@ func NewQueryLongTermMemoryEinoTool(memoryRetriever MemoryRetriever, memoryServi
 	}
 }
 
-func NewGetMemoryDetailEinoTool(memoryService MemoryService, trace TraceEvent) *EinoTool {
-	return &EinoTool{
+func NewGetMemoryDetailTool(memoryService MemoryService, trace TraceEvent) *RegisteredTool {
+	return &RegisteredTool{
 		name: ToolGetMemoryDetail,
 		desc: "根据 memory_id 获取某条长期记忆的完整详情。先通过 query_long_term_memory 找到 memory_id，再按需调用。",
 		parameters: map[string]*schema.ParameterInfo{

@@ -402,7 +402,7 @@ func (h *MemoryHandler) ReindexMemories(c *gin.Context) {
 }
 
 func (h *MemoryHandler) ListAgentTools(c *gin.Context) {
-	infos, err := h.chatPipeline.DebugListEinoTools(c.Request.Context())
+	infos, err := h.chatPipeline.DebugListTools(c.Request.Context())
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, err.Error())
 		return

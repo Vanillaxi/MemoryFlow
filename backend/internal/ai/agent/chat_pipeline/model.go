@@ -10,6 +10,6 @@ type ChatModel interface {
 	Generate(ctx context.Context, prompt string) (string, error)
 }
 
-func NewModel(cfg models.Config) *models.ArkEinoChatModel {
-	return models.NewArkEinoChatModel(cfg)
+func NewModel(cfg models.Config) *models.ArkToolCallingChatModel {
+	return models.NewArkToolCallingChatModel(cfg)
 }

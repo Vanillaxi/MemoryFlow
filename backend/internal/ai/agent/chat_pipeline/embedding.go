@@ -7,5 +7,5 @@ import (
 )
 
 func NewEmbedding(client *embedder.Client) einoembedding.Embedder {
-	return embedder.NewEinoAdapter(client)
+	return embedder.NewEmbedderAdapter(client)
 }
