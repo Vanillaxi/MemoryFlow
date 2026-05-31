@@ -1,9 +1,19 @@
-package text_analyze
+package memory_analyze
 
 import "fmt"
 
-// TODO:这里先用普通的fmt.Sprintf，跑通后再换Eino的PromptTemplate
-func BuildPrompt(input TextAnalyzeInput) string {
+func BuildPrompt(input AnalyzeInput) string {
+	switch input.Type {
+	case TypeImage:
+		return buildImagePrompt(input)
+	case TypeMixed:
+		return buildMixedPrompt(input)
+	default:
+		return buildTextPrompt(input)
+	}
+}
+
+func buildTextPrompt(input AnalyzeInput) string {
 	return fmt.Sprintf(`你是 MemoryFlow 的个人记忆分析助手。
 
 请根据用户的一条生活记忆，提取结构化信息。
@@ -37,5 +47,13 @@ func BuildPrompt(input TextAnalyzeInput) string {
   "mood": "positive",
   "importance_score": 0.7
 }
-`, input.ContentText, input.Location, input.CreatedAt.Format("2006-01-02 15:04:05"))
+`, input.ContentText, input.Location, input.OccurredAt.Format("2006-01-02 15:04:05"))
+}
+
+func buildImagePrompt(input AnalyzeInput) string {
+	return fmt.Sprintf("图片记忆：%s\n地点：%s\n时间：%s", input.ImageURL, input.Location, input.OccurredAt.Format("2006-01-02 15:04:05"))
+}
+
+func buildMixedPrompt(input AnalyzeInput) string {
+	return fmt.Sprintf("图文记忆：%s\n说明：%s\n地点：%s\n时间：%s", input.ImageURL, input.ContentText, input.Location, input.OccurredAt.Format("2006-01-02 15:04:05"))
 }

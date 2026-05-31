@@ -7,8 +7,7 @@ import (
 	"log"
 	"memoryflow/internal/ai/embedder"
 	"memoryflow/internal/ai/vectorstore"
-	"memoryflow/internal/ai/workflow/image_analyze"
-	"memoryflow/internal/ai/workflow/text_analyze"
+	"memoryflow/internal/ai/workflow/memory_analyze"
 	"memoryflow/internal/domain/model"
 	"memoryflow/internal/domain/service"
 	"strings"
@@ -16,31 +15,32 @@ import (
 )
 
 type Worker struct {
-	taskService          *service.TaskService
-	memoryService        *service.MemoryService
-	textAnalyzeWorkflow  *text_analyze.Workflow
-	imageAnalyzeWorkflow *image_analyze.Workflow
-	embeddingClient      *embedder.Client
-	milvusStore          *vectorstore.MilvusStore
-	interval             time.Duration
+	taskService           *service.TaskService
+	memoryService         *service.MemoryService
+	memoryAnalyzeWorkflow memoryAnalyzeWorkflow
+	embeddingClient       *embedder.Client
+	milvusStore           *vectorstore.MilvusStore
+	interval              time.Duration
+}
+
+type memoryAnalyzeWorkflow interface {
+	Invoke(ctx context.Context, input memory_analyze.AnalyzeInput) (*memory_analyze.AnalyzeResult, error)
 }
 
 func NewWorker(
 	taskService *service.TaskService,
 	memoryService *service.MemoryService,
-	textAnalyzeWorkflow *text_analyze.Workflow,
-	imageAnalyzeWorkflow *image_analyze.Workflow,
+	memoryAnalyzeWorkflow memoryAnalyzeWorkflow,
 	embeddingClient *embedder.Client,
 	milvusStore *vectorstore.MilvusStore,
 ) *Worker {
 	return &Worker{
-		taskService:          taskService,
-		memoryService:        memoryService,
-		textAnalyzeWorkflow:  textAnalyzeWorkflow,
-		imageAnalyzeWorkflow: imageAnalyzeWorkflow,
-		embeddingClient:      embeddingClient,
-		milvusStore:          milvusStore,
-		interval:             2 * time.Second,
+		taskService:           taskService,
+		memoryService:         memoryService,
+		memoryAnalyzeWorkflow: memoryAnalyzeWorkflow,
+		embeddingClient:       embeddingClient,
+		milvusStore:           milvusStore,
+		interval:              2 * time.Second,
 	}
 }
 
@@ -85,9 +85,9 @@ func (w *Worker) handleTask(ctx context.Context, t model.Task) {
 
 	switch t.TaskType {
 	case service.TaskTypeTextAnalyze:
-		err = w.handleTextAnalyze(ctx, t)
+		err = w.handleAnalyze(ctx, t)
 	case service.TaskTypeImageAnalyze:
-		err = w.handleImageAnalyze(ctx, t)
+		err = w.handleAnalyze(ctx, t)
 	case service.TaskTypeEmbedding:
 		err = w.handleEmbedding(ctx, t)
 	default:
@@ -107,24 +107,17 @@ func (w *Worker) handleTask(ctx context.Context, t model.Task) {
 
 }
 
-func (w *Worker) handleTextAnalyze(ctx context.Context, t model.Task) error {
+func (w *Worker) handleAnalyze(ctx context.Context, t model.Task) error {
 	item, err := w.memoryService.GetByID(ctx, t.TargetID)
 	if err != nil {
 		return err
 	}
 
-	result, err := w.textAnalyzeWorkflow.Run(ctx, text_analyze.TextAnalyzeInput{
-		MemoryID:    item.ID,
-		ContentText: item.ContentText,
-		Location:    item.Location,
-		CreatedAt:   item.CreatedAt,
-	})
+	result, err := w.memoryAnalyzeWorkflow.Invoke(ctx, analyzeInputFromMemory(item))
 	if err != nil {
-		//task failed
 		return err
 	}
 
-	//数据库 tags 字段如果是 string，就需要 json.Marshal 成字符串
 	tagsBytes, err := json.Marshal(result.Tags)
 	if err != nil {
 		return err
@@ -146,50 +139,19 @@ func (w *Worker) handleTextAnalyze(ctx context.Context, t model.Task) error {
 		return err
 	}
 
-	log.Printf("[task-worker] created embedding task,memory_id=%d\n", item.ID)
+	log.Printf("[task-worker] created embedding task, memory_id=%d\n", item.ID)
 	return nil
 }
 
-func (w *Worker) handleImageAnalyze(ctx context.Context, t model.Task) error {
-	item, err := w.memoryService.GetByID(ctx, t.TargetID)
-	if err != nil {
-		return err
-	}
-
-	result, err := w.imageAnalyzeWorkflow.Run(image_analyze.ImageAnalyzeInput{
+func analyzeInputFromMemory(item *model.MemoryItem) memory_analyze.AnalyzeInput {
+	return memory_analyze.AnalyzeInput{
 		MemoryID:    item.ID,
+		Type:        item.Type,
 		ImageURL:    item.ImageURL,
 		ContentText: item.ContentText,
 		Location:    item.Location,
-		CreatedAt:   item.CreatedAt,
-	})
-	if err != nil {
-		return err
+		OccurredAt:  item.OccurredAt,
 	}
-
-	tagsBytes, err := json.Marshal(result.Tags)
-	if err != nil {
-		return err
-	}
-
-	if err := w.memoryService.UpdateAnalysis(
-		ctx,
-		item.ID,
-		result.Summary,
-		string(tagsBytes),
-		result.Mood,
-		result.ImportanceScore,
-	); err != nil {
-		return err
-	}
-
-	_, err = w.taskService.CreateTask(ctx, service.TaskTypeEmbedding, item.ID)
-	if err != nil {
-		return err
-	}
-
-	log.Printf("[task-worker] created embedding task for image memory, memory_id=%d\n", item.ID)
-	return nil
 }
 
 func (w *Worker) handleEmbedding(ctx context.Context, t model.Task) error {

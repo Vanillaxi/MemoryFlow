@@ -13,44 +13,29 @@ section() {
 section "Running Go tests"
 go test ./...
 
-section "Building cmd/server"
-go build ./cmd/server
+section "Building service"
+go build .
 
-section "Building cmd/memory_chat_cmd"
-go build ./cmd/memory_chat_cmd
+section "Building cmd/chat_cmd"
+go build ./cmd/chat_cmd
 
-section "Building cmd/memory_index_cmd"
-go build ./cmd/memory_index_cmd
-
-section "Building cmd/text_analyze_cmd"
-go build ./cmd/text_analyze_cmd
-
-section "Building cmd/image_analyze_cmd"
-go build ./cmd/image_analyze_cmd
+section "Building cmd/knowledge_cmd"
+go build ./cmd/knowledge_cmd
 
 if [[ "${RUN_AI:-0}" == "1" ]]; then
-  section "Smoke test: text_analyze_cmd"
-  go run ./cmd/text_analyze_cmd "今天我把 MemoryFlow 的 cmd 调试入口补好了"
+  section "Smoke test: chat_cmd recent week debug trace"
+  go run ./cmd/chat_cmd --debug "最近一周我记录了什么"
 
-  section "Smoke test: memory_chat_cmd"
-  go run ./cmd/memory_chat_cmd "我最近在做什么项目"
-
-  section "Smoke test: memory_chat_cmd recent week debug trace"
-  go run ./cmd/memory_chat_cmd --debug "最近一周我记录了什么"
-
-  section "Smoke test: memory_chat_cmd aggregate debug trace"
-  go run ./cmd/memory_chat_cmd --debug "总结一下五月份我主要做了什么"
-
-  section "Smoke test: memory_chat_cmd evidence debug trace"
-  go run ./cmd/memory_chat_cmd --debug "和 Eino 有关的记忆有哪些"
+  section "Smoke test: chat_cmd aggregate debug trace"
+  go run ./cmd/chat_cmd --debug "总结一下五月份我主要做了什么"
 fi
 
 if [[ "${RUN_INDEX:-0}" == "1" ]]; then
-  section "Smoke test: memory_index_cmd"
-  go run ./cmd/memory_index_cmd --batch-size=50
+  section "Smoke test: knowledge_cmd"
+  go run ./cmd/knowledge_cmd --batch-size=50
 fi
 
 section "Cleaning build artifacts"
-rm -f server memory_chat_cmd memory_index_cmd text_analyze_cmd image_analyze_cmd
+rm -f memoryflow chat_cmd knowledge_cmd
 
 printf '\nAll checks passed\n'

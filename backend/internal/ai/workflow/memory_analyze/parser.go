@@ -1,4 +1,4 @@
-package text_analyze
+package memory_analyze
 
 import (
 	"encoding/json"
@@ -6,13 +6,13 @@ import (
 	"strings"
 )
 
-func ParseAnalyzeResult(raw string) (*AIAnalyzeResult, error) {
+func ParseAnalyzeResult(raw string) (*AnalyzeResult, error) {
 	jsonText, err := extractJSON(raw)
 	if err != nil {
 		return nil, err
 	}
 
-	var result AIAnalyzeResult
+	var result AnalyzeResult
 	if err := json.Unmarshal([]byte(jsonText), &result); err != nil {
 		return nil, err
 	}

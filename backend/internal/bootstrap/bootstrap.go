@@ -11,8 +11,7 @@ import (
 	"memoryflow/internal/ai/reranker"
 	"memoryflow/internal/ai/retriever"
 	"memoryflow/internal/ai/vectorstore"
-	"memoryflow/internal/ai/workflow/image_analyze"
-	"memoryflow/internal/ai/workflow/text_analyze"
+	"memoryflow/internal/ai/workflow/memory_analyze"
 	"memoryflow/internal/config"
 	"memoryflow/internal/domain/repository"
 	"memoryflow/internal/domain/service"
@@ -31,8 +30,7 @@ type App struct {
 	AnalysisChatModel    *models.ChatModel
 	ToolCallingChatModel *models.ArkToolCallingChatModel
 
-	TextAnalyzeWorkflow  *text_analyze.Workflow
-	ImageAnalyzeWorkflow *image_analyze.Workflow
+	MemoryAnalyzeWorkflow *memory_analyze.Workflow
 
 	MilvusStore     *vectorstore.MilvusStore
 	EmbeddingClient *embedder.Client
@@ -75,8 +73,7 @@ func NewApp(ctx context.Context) (*App, error) {
 		ModelName: cfg.Model.ModelName,
 	})
 
-	textAnalyzeWorkflow := text_analyze.NewWorkflow(analysisChatModel)
-	imageAnalyzeWorkflow := image_analyze.NewWorkflow()
+	memoryAnalyzeWorkflow := memory_analyze.NewWorkflow(analysisChatModel)
 
 	milvusStore, err := vectorstore.NewMilvusStore(
 		ctx,
@@ -133,8 +130,7 @@ func NewApp(ctx context.Context) (*App, error) {
 	worker := task.NewWorker(
 		taskService,
 		memoryService,
-		textAnalyzeWorkflow,
-		imageAnalyzeWorkflow,
+		memoryAnalyzeWorkflow,
 		embeddingClient,
 		milvusStore,
 	)
@@ -148,8 +144,7 @@ func NewApp(ctx context.Context) (*App, error) {
 		AnalysisChatModel:    analysisChatModel,
 		ToolCallingChatModel: toolCallingChatModel,
 
-		TextAnalyzeWorkflow:  textAnalyzeWorkflow,
-		ImageAnalyzeWorkflow: imageAnalyzeWorkflow,
+		MemoryAnalyzeWorkflow: memoryAnalyzeWorkflow,
 
 		MilvusStore:     milvusStore,
 		EmbeddingClient: embeddingClient,

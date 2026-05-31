@@ -42,7 +42,6 @@ func NewChatModel(baseURL string, apiKey string, modelName string) *ChatModel {
 	}
 }
 
-// TODO:这版是OpenAI-compatible HTTP调用，后续可再改为 Eino component。
 func (m *ChatModel) Generate(ctx context.Context, prompt string) (string, error) {
 	return m.GenerateWithSystem(
 		ctx,

@@ -31,7 +31,7 @@ func main() {
 		BatchSize: batchSize,
 	})
 	if err != nil {
-		log.Fatalf("memory index reindex failed: %v", err)
+		log.Fatalf("knowledge pipeline reindex failed: %v", err)
 	}
 
 	printJSON(output)

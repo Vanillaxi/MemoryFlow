@@ -13,8 +13,6 @@ import (
 	"time"
 )
 
-//TODO:OpenAI,后期改为eino
-
 type Client struct {
 	baseURL   string
 	apiKey    string
