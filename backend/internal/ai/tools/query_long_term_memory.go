@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"memoryflow/internal/ai/agent/memory_summary_pipeline"
 	"memoryflow/internal/ai/retriever"
 	"memoryflow/internal/domain/model"
 )
@@ -56,7 +55,7 @@ func QueryLongTermMemory(
 			Items: toItems(memories),
 		}
 		if mode == ModeAggregate {
-			aggregation := memory_summary_pipeline.AggregateMemories(memories)
+			aggregation := AggregateMemories(memories)
 			output.Aggregation = &LongTermMemoryAggregation{
 				Count:      aggregation.Count,
 				Tags:       aggregation.Tags,

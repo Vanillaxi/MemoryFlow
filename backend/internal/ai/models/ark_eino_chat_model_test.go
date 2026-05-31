@@ -27,8 +27,8 @@ func TestGenerate(t *testing.T) {
 						"id": "call_123",
 						"type": "function",
 						"function": {
-							"name": "ask_memory",
-							"arguments": "{\"question\":\"embedding\"}"
+							"name": "query_long_term_memory",
+							"arguments": "{\"query\":\"embedding\"}"
 						}
 					}]
 				},
@@ -56,7 +56,7 @@ func TestGenerate(t *testing.T) {
 	if len(out.ToolCalls) != 1 {
 		t.Fatalf("expected one tool call, got %d", len(out.ToolCalls))
 	}
-	if out.ToolCalls[0].Function.Name != "ask_memory" {
+	if out.ToolCalls[0].Function.Name != "query_long_term_memory" {
 		t.Fatalf("unexpected tool name: %s", out.ToolCalls[0].Function.Name)
 	}
 	if out.ResponseMeta == nil || out.ResponseMeta.FinishReason != "tool_calls" {
@@ -72,7 +72,7 @@ func TestBindTools(t *testing.T) {
 	})
 
 	err := model.BindTools([]*schema.ToolInfo{
-		{Name: "ask_memory", Desc: "测试工具"},
+		{Name: "query_long_term_memory", Desc: "测试工具"},
 	})
 	if err != nil {
 		t.Fatal(err)

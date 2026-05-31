@@ -27,9 +27,8 @@ func main() {
 		app.TaskService,
 		app.Storage,
 		app.MemoryRetriever,
-		app.MemoryAgent,
-		app.MemoryIndexPipeline,
-		app.MemorySummaryPipeline,
+		app.ChatPipeline,
+		app.KnowledgePipeline,
 	)
 	taskHandler := api.NewTaskHandler(app.TaskService)
 

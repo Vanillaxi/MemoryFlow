@@ -16,17 +16,11 @@ go test ./...
 section "Building cmd/server"
 go build ./cmd/server
 
-section "Building cmd/memory_agent_cmd"
-go build ./cmd/memory_agent_cmd
-
 section "Building cmd/memory_chat_cmd"
 go build ./cmd/memory_chat_cmd
 
 section "Building cmd/memory_index_cmd"
 go build ./cmd/memory_index_cmd
-
-section "Building cmd/memory_summary_cmd"
-go build ./cmd/memory_summary_cmd
 
 section "Building cmd/text_analyze_cmd"
 go build ./cmd/text_analyze_cmd
@@ -41,17 +35,14 @@ if [[ "${RUN_AI:-0}" == "1" ]]; then
   section "Smoke test: memory_chat_cmd"
   go run ./cmd/memory_chat_cmd "我最近在做什么项目"
 
-  section "Smoke test: memory_agent_cmd recent week debug trace"
-  go run ./cmd/memory_agent_cmd --debug "最近一周我记录了什么"
+  section "Smoke test: memory_chat_cmd recent week debug trace"
+  go run ./cmd/memory_chat_cmd --debug "最近一周我记录了什么"
 
-  section "Smoke test: memory_agent_cmd aggregate debug trace"
-  go run ./cmd/memory_agent_cmd --debug "总结一下五月份我主要做了什么"
+  section "Smoke test: memory_chat_cmd aggregate debug trace"
+  go run ./cmd/memory_chat_cmd --debug "总结一下五月份我主要做了什么"
 
-  section "Smoke test: memory_agent_cmd evidence debug trace"
-  go run ./cmd/memory_agent_cmd --debug "和 Eino 有关的记忆有哪些"
-
-  section "Smoke test: memory_summary_cmd"
-  go run ./cmd/memory_summary_cmd --from=2026-05-01 --to=2026-05-31
+  section "Smoke test: memory_chat_cmd evidence debug trace"
+  go run ./cmd/memory_chat_cmd --debug "和 Eino 有关的记忆有哪些"
 fi
 
 if [[ "${RUN_INDEX:-0}" == "1" ]]; then
@@ -60,6 +51,6 @@ if [[ "${RUN_INDEX:-0}" == "1" ]]; then
 fi
 
 section "Cleaning build artifacts"
-rm -f server memory_agent_cmd memory_chat_cmd memory_index_cmd memory_summary_cmd text_analyze_cmd image_analyze_cmd
+rm -f server memory_chat_cmd memory_index_cmd text_analyze_cmd image_analyze_cmd
 
 printf '\nAll checks passed\n'

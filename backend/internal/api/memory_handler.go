@@ -1,9 +1,8 @@
 package api
 
 import (
-	"memoryflow/internal/ai/agent/memory_index_pipeline"
-	"memoryflow/internal/ai/agent/memory_react_agent"
-	"memoryflow/internal/ai/agent/memory_summary_pipeline"
+	"memoryflow/internal/ai/agent/chat_pipeline"
+	"memoryflow/internal/ai/agent/knowledge_pipeline"
 	"memoryflow/internal/ai/retriever"
 	"memoryflow/internal/domain/service"
 	"memoryflow/internal/pkg/response"
@@ -17,13 +16,12 @@ import (
 )
 
 type MemoryHandler struct {
-	memoryService         *service.MemoryService
-	taskService           *service.TaskService
-	storage               *storage.LocalStorage
-	memoryRetriever       *retriever.MemoryRetriever
-	memoryAgent           *memory_react_agent.MemoryAgent
-	memoryIndexPipeline   *memory_index_pipeline.Pipeline
-	memorySummaryPipeline *memory_summary_pipeline.Pipeline
+	memoryService     *service.MemoryService
+	taskService       *service.TaskService
+	storage           *storage.LocalStorage
+	memoryRetriever   *retriever.MemoryRetriever
+	chatPipeline      *chat_pipeline.Pipeline
+	knowledgePipeline *knowledge_pipeline.Pipeline
 }
 
 func NewMemoryHandler(
@@ -31,18 +29,16 @@ func NewMemoryHandler(
 	taskService *service.TaskService,
 	storage *storage.LocalStorage,
 	memoryRetriever *retriever.MemoryRetriever,
-	memoryAgent *memory_react_agent.MemoryAgent,
-	memoryIndexPipeline *memory_index_pipeline.Pipeline,
-	memorySummaryPipeline *memory_summary_pipeline.Pipeline,
+	chatPipeline *chat_pipeline.Pipeline,
+	knowledgePipeline *knowledge_pipeline.Pipeline,
 ) *MemoryHandler {
 	return &MemoryHandler{
-		memoryService:         memoryService,
-		taskService:           taskService,
-		storage:               storage,
-		memoryRetriever:       memoryRetriever,
-		memoryAgent:           memoryAgent,
-		memoryIndexPipeline:   memoryIndexPipeline,
-		memorySummaryPipeline: memorySummaryPipeline,
+		memoryService:     memoryService,
+		taskService:       taskService,
+		storage:           storage,
+		memoryRetriever:   memoryRetriever,
+		chatPipeline:      chatPipeline,
+		knowledgePipeline: knowledgePipeline,
 	}
 }
 
@@ -204,7 +200,7 @@ func (h *MemoryHandler) SummarizeMemories(c *gin.Context) {
 		}
 	}
 
-	output, err := h.memorySummaryPipeline.Invoke(c.Request.Context(), memory_summary_pipeline.SummaryInput{
+	output, err := h.chatPipeline.Summarize(c.Request.Context(), chat_pipeline.SummaryInput{
 		From:  from,
 		To:    to,
 		Limit: limit,
@@ -328,7 +324,7 @@ func (h *MemoryHandler) Ask(c *gin.Context) {
 		endTime = &parsed
 	}
 
-	result, err := h.memoryAgent.Invoke(c.Request.Context(), memory_react_agent.AgentInput{
+	result, err := h.chatPipeline.Invoke(c.Request.Context(), chat_pipeline.ChatInput{
 		Message:   q,
 		TopK:      topK,
 		Type:      memoryType,
@@ -394,7 +390,7 @@ func (h *MemoryHandler) ReindexMemories(c *gin.Context) {
 		}
 	}
 
-	result, err := h.memoryIndexPipeline.ReindexAll(c.Request.Context(), memory_index_pipeline.ReindexInput{
+	result, err := h.knowledgePipeline.ReindexAll(c.Request.Context(), knowledge_pipeline.ReindexInput{
 		BatchSize: batchSize,
 	})
 	if err != nil {
@@ -406,27 +402,11 @@ func (h *MemoryHandler) ReindexMemories(c *gin.Context) {
 }
 
 func (h *MemoryHandler) ListAgentTools(c *gin.Context) {
-	infos, err := h.memoryAgent.DebugListEinoTools(c.Request.Context())
+	infos, err := h.chatPipeline.DebugListEinoTools(c.Request.Context())
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	response.OK(c, infos)
-}
-
-func (h *MemoryHandler) AskMemoryAgent(c *gin.Context) {
-	var req memory_react_agent.AgentInput
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, err.Error())
-		return
-	}
-
-	output, err := h.memoryAgent.Invoke(c.Request.Context(), req)
-	if err != nil {
-		response.Error(c, 500, err.Error())
-		return
-	}
-
-	response.OK(c, output)
 }

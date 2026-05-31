@@ -4,13 +4,9 @@ import (
 	"context"
 	"log"
 
-	"memoryflow/internal/ai/agent/memory_chat_pipeline"
-	"memoryflow/internal/ai/agent/memory_index_pipeline"
-	"memoryflow/internal/ai/agent/memory_react_agent"
-	"memoryflow/internal/ai/agent/memory_summary_pipeline"
+	"memoryflow/internal/ai/agent/chat_pipeline"
+	"memoryflow/internal/ai/agent/knowledge_pipeline"
 	"memoryflow/internal/ai/embedder"
-	"memoryflow/internal/ai/indexer"
-	"memoryflow/internal/ai/loader"
 	"memoryflow/internal/ai/models"
 	"memoryflow/internal/ai/reranker"
 	"memoryflow/internal/ai/retriever"
@@ -43,10 +39,8 @@ type App struct {
 	MemoryRetriever *retriever.MemoryRetriever
 	MemoryReranker  *reranker.MemoryReranker
 
-	MemoryChatPipeline    *memory_chat_pipeline.Pipeline
-	MemoryIndexPipeline   *memory_index_pipeline.Pipeline
-	MemorySummaryPipeline *memory_summary_pipeline.Pipeline
-	MemoryAgent           *memory_react_agent.MemoryAgent
+	ChatPipeline      *chat_pipeline.Pipeline
+	KnowledgePipeline *knowledge_pipeline.Pipeline
 
 	Storage *storage.LocalStorage
 	Worker  *task.Worker
@@ -75,7 +69,7 @@ func NewApp(ctx context.Context) (*App, error) {
 		cfg.Model.ModelName,
 	)
 
-	einoChatModel := models.NewArkEinoChatModel(models.Config{
+	einoChatModel := chat_pipeline.NewModel(models.Config{
 		BaseURL:   cfg.Model.BaseURL,
 		APIKey:    cfg.Model.APIKey,
 		ModelName: cfg.Model.ModelName,
@@ -106,7 +100,7 @@ func NewApp(ctx context.Context) (*App, error) {
 		cfg.Embedding.Dim,
 	)
 
-	memoryRetriever := retriever.NewMemoryRetriever(
+	memoryRetriever := chat_pipeline.NewRetriever(
 		embeddingClient,
 		milvusStore,
 		memoryService,
@@ -114,33 +108,19 @@ func NewApp(ctx context.Context) (*App, error) {
 
 	memoryReranker := reranker.NewMemoryReranker()
 
-	memoryChatPipeline, err := memory_chat_pipeline.NewPipeline(
-		ctx,
-		memoryRetriever,
-		memoryReranker,
-		analysisChatModel,
-	)
-	if err != nil {
-		_ = milvusStore.Close(ctx)
-		return nil, err
-	}
-
-	memoryIndexPipeline := memory_index_pipeline.NewPipeline(
-		loader.NewMemoryLoader(memoryService),
-		indexer.NewMemoryIndexer(
+	knowledgePipeline := knowledge_pipeline.NewPipeline(
+		knowledge_pipeline.NewLoader(memoryService),
+		knowledge_pipeline.NewIndexer(
 			embeddingClient,
 			milvusStore,
 		),
 	)
 
-	memorySummaryPipeline := memory_summary_pipeline.NewPipeline(memoryService, analysisChatModel)
-
-	memoryAgent, err := memory_react_agent.NewMemoryAgent(
+	chatPipeline, err := chat_pipeline.NewPipeline(
 		ctx,
-		memoryChatPipeline,
 		memoryRetriever,
 		memoryService,
-		memorySummaryPipeline,
+		analysisChatModel,
 		einoChatModel,
 	)
 	if err != nil {
@@ -176,10 +156,8 @@ func NewApp(ctx context.Context) (*App, error) {
 		MemoryRetriever: memoryRetriever,
 		MemoryReranker:  memoryReranker,
 
-		MemoryChatPipeline:    memoryChatPipeline,
-		MemoryIndexPipeline:   memoryIndexPipeline,
-		MemorySummaryPipeline: memorySummaryPipeline,
-		MemoryAgent:           memoryAgent,
+		ChatPipeline:      chatPipeline,
+		KnowledgePipeline: knowledgePipeline,
 
 		Storage: localStorage,
 		Worker:  worker,

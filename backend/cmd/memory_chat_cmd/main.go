@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 
-	"memoryflow/internal/ai/agent/memory_chat_pipeline"
+	"memoryflow/internal/ai/agent/chat_pipeline"
 	"memoryflow/internal/bootstrap"
 )
 
@@ -16,7 +16,10 @@ const defaultQuestion = "我最近在做什么项目？"
 
 func main() {
 	ctx := context.Background()
-	question := strings.TrimSpace(strings.Join(os.Args[1:], " "))
+	debug := flag.Bool("debug", false, "print chat pipeline ReAct trace")
+	flag.Parse()
+
+	question := strings.TrimSpace(strings.Join(flag.Args(), " "))
 	if question == "" {
 		question = defaultQuestion
 	}
@@ -27,12 +30,13 @@ func main() {
 	}
 	defer app.Close(ctx)
 
-	output, err := app.MemoryChatPipeline.Run(ctx, memory_chat_pipeline.ChatInput{
-		Question: question,
-		TopK:     20,
+	output, err := app.ChatPipeline.Invoke(ctx, chat_pipeline.ChatInput{
+		Message: question,
+		TopK:    20,
+		Debug:   *debug,
 	})
 	if err != nil {
-		log.Fatalf("memory chat pipeline failed: %v", err)
+		log.Fatalf("chat pipeline failed: %v", err)
 	}
 
 	printJSON(output)
