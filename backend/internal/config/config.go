@@ -14,6 +14,7 @@ type Config struct {
 	Model     ModelConfig     `mapstructure:"model"`
 	Embedding EmbeddingConfig `mapstructure:"embedding"`
 	Milvus    MilvusConfig    `mapstructure:"milvus"`
+	Github    GithubConfig    `mapstructure:"github"`
 }
 
 type ServerConfig struct {
@@ -48,6 +49,12 @@ type MilvusConfig struct {
 	Collection string `mapstructure:"collection"`
 }
 
+type GithubConfig struct {
+	Token        string `mapstructure:"token"`
+	DefaultLimit int    `mapstructure:"default_limit"`
+	DefaultDays  int    `mapstructure:"default_days"`
+}
+
 func LoadConfig(path string) (*Config, error) {
 	v := viper.New()
 
@@ -59,6 +66,8 @@ func LoadConfig(path string) (*Config, error) {
 	v.SetDefault("database.driver", "sqlite")
 	v.SetDefault("database.dsn", "../memoryflow-data/data/memoryflow.db")
 	v.SetDefault("stroage.upload_dir", "../memoryflow-data/uploads")
+	v.SetDefault("github.default_limit", 10)
+	v.SetDefault("github.default_days", 7)
 
 	for key, env := range map[string]string{
 		"server.host":    "SERVER_HOST",

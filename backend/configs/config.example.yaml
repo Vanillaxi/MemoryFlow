@@ -25,3 +25,8 @@ embedding:
 milvus:
   address: "localhost:19530"
   collection: "memoryflow_memories"
+
+github:
+  token: ""
+  default_limit: 10
+  default_days: 7

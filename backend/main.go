@@ -34,10 +34,11 @@ func main() {
 		app.KnowledgePipeline,
 	)
 	taskHandler := api.NewTaskHandler(app.TaskService)
+	projectHandler := api.NewProjectHandler(app.ProjectService)
 	agentHandler := api.NewAgentHandler(app.Agent)
 
 	r := gin.Default()
-	api.RegisterRoutes(r, memoryHandler, taskHandler, agentHandler, app.Config.Storage.UploadDir)
+	api.RegisterRoutes(r, memoryHandler, taskHandler, projectHandler, agentHandler, app.Config.Storage.UploadDir)
 
 	addr := fmt.Sprintf(":%d", app.Config.Server.Port)
 	if host := strings.TrimSpace(app.Config.Server.Host); host != "" {

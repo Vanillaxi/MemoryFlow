@@ -2,13 +2,12 @@ package agent
 
 import (
 	"context"
-	"strings"
 	"testing"
 
+	"memoryflow/internal/ai/agent/project_pipeline"
 	memorytools "memoryflow/internal/ai/tools"
 	githubtools "memoryflow/internal/ai/tools/github"
-	memorytool "memoryflow/internal/ai/tools/memory"
-	systemtool "memoryflow/internal/ai/tools/system"
+	"memoryflow/internal/domain/model"
 )
 
 type fakeTool struct {
@@ -23,30 +22,38 @@ func (f fakeTool) Call(context.Context, map[string]any) (string, error) {
 	return f.result, f.err
 }
 
-type fakeSummaryModel struct {
-	prompt string
-}
+type fakeSummaryModel struct{}
 
-func (f *fakeSummaryModel) GenerateWithSystem(_ context.Context, _ string, prompt string) (string, error) {
-	f.prompt = prompt
+func (f *fakeSummaryModel) GenerateWithSystem(_ context.Context, _ string, _ string) (string, error) {
 	return " 已完成项目进展总结。 ", nil
 }
 
-func TestChatProjectProgressUsesExpectedTools(t *testing.T) {
-	registry := memorytools.NewToolRegistry()
-	registry.Register(fakeTool{name: systemtool.ToolGetCurrentTime, result: `{"date":"2026-06-01"}`})
-	registry.Register(fakeTool{name: memorytool.ToolQueryLongTermMemory, result: `{"evidence":[]}`})
-	registry.Register(fakeTool{name: githubtools.ToolGetRecentCommits, result: `{"commits":[]}`})
-	model := &fakeSummaryModel{}
+type fakeProjectAgent struct {
+	input project_pipeline.ProjectAgentInput
+}
 
-	output, err := NewAgent(registry, model, nil).Chat(context.Background(), ChatInput{Message: "MemoryFlow 最近做到哪了？"})
+func (f *fakeProjectAgent) Invoke(_ context.Context, input project_pipeline.ProjectAgentInput) (*project_pipeline.ProjectAgentOutput, error) {
+	f.input = input
+	return &project_pipeline.ProjectAgentOutput{
+		Answer:    "已完成项目进展总结。",
+		Project:   model.Project{Name: "MemoryFlow", RepoOwner: "vanillaxi", RepoName: "MemoryFlow"},
+		UsedTools: []string{githubtools.ToolGetRecentCommits},
+	}, nil
+}
+
+func TestChatProjectProgressUsesProjectAgent(t *testing.T) {
+	projectAgent := &fakeProjectAgent{}
+	currentAgent := NewAgent(memorytools.NewToolRegistry(), &fakeSummaryModel{}, nil)
+	currentAgent.SetProjectAgent(projectAgent)
+
+	output, err := currentAgent.Chat(context.Background(), ChatInput{Message: "MemoryFlow 最近做到哪了？", Days: 3, Limit: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if output.Intent != "project_progress" || len(output.UsedTools) != 3 || output.UsedTools[2] != githubtools.ToolGetRecentCommits {
+	if output.Intent != "project_progress" || output.Pipeline != "project_pipeline" || len(output.UsedTools) != 1 || output.UsedTools[0] != githubtools.ToolGetRecentCommits {
 		t.Fatalf("unexpected output: %#v", output)
 	}
-	if strings.Contains(output.Answer, " ") || !strings.Contains(model.prompt, `commits`) {
-		t.Fatalf("unexpected answer=%q prompt=%q", output.Answer, model.prompt)
+	if projectAgent.input.Days != 3 || projectAgent.input.Limit != 5 {
+		t.Fatalf("unexpected project agent input: %#v", projectAgent.input)
 	}
 }

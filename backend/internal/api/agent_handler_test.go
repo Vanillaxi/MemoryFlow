@@ -9,9 +9,11 @@ import (
 	"testing"
 
 	"memoryflow/internal/ai/agent"
+	"memoryflow/internal/ai/agent/project_pipeline"
 	agentruntime "memoryflow/internal/ai/agent/runtime"
 	memorytools "memoryflow/internal/ai/tools"
 	systemtool "memoryflow/internal/ai/tools/system"
+	"memoryflow/internal/domain/model"
 
 	"github.com/gin-gonic/gin"
 )
@@ -24,10 +26,41 @@ func (fakeAgentTool) Call(context.Context, map[string]any) (string, error) {
 	return `{"date":"2026-06-01"}`, nil
 }
 
+type fakeAPIProjectAgent struct{}
+
+func (fakeAPIProjectAgent) Invoke(context.Context, project_pipeline.ProjectAgentInput) (*project_pipeline.ProjectAgentOutput, error) {
+	return &project_pipeline.ProjectAgentOutput{
+		Answer:    "项目进展",
+		Project:   model.Project{Name: "MemoryFlow", RepoOwner: "vanillaxi", RepoName: "MemoryFlow"},
+		UsedTools: []string{"get_recent_commits"},
+	}, nil
+}
+
 type fakeAgentSummaryModel struct{}
 
 func (fakeAgentSummaryModel) GenerateWithSystem(context.Context, string, string) (string, error) {
 	return "你好", nil
+}
+
+func TestAgentChatRoutesProjectQuestionToProjectPipeline(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	currentAgent := agent.NewAgent(memorytools.NewToolRegistry(), fakeAgentSummaryModel{}, fakeAgentPipeline{})
+	currentAgent.SetProjectAgent(fakeAPIProjectAgent{})
+	router := gin.New()
+	router.POST("/agent/chat", NewAgentHandler(currentAgent).Chat)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/agent/chat", bytes.NewBufferString(`{"message":"我的 MemoryFlow 最近做到哪了？"}`))
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(recorder, request)
+
+	var output agent.ChatOutput
+	if err := json.Unmarshal(recorder.Body.Bytes(), &output); err != nil {
+		t.Fatal(err)
+	}
+	if recorder.Code != http.StatusOK || output.Pipeline != "project_pipeline" || output.Project == nil || output.Project.Name != "MemoryFlow" {
+		t.Fatalf("status=%d output=%#v", recorder.Code, output)
+	}
 }
 
 type fakeAgentPipeline struct{}

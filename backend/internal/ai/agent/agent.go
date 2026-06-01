@@ -19,6 +19,7 @@ type Agent struct {
 	toolExecutor   *agentruntime.ToolExecutor
 	contextBuilder *agentruntime.ContextBuilder
 	model          SummaryModel
+	projectAgent   ProjectAgent
 }
 
 func NewAgent(registry *tools.ToolRegistry, model SummaryModel, chatPipeline Pipeline) *Agent {
@@ -26,13 +27,16 @@ func NewAgent(registry *tools.ToolRegistry, model SummaryModel, chatPipeline Pip
 		dispatch: dispatcher.Dispatch,
 		pipelines: map[string]Pipeline{
 			dispatcher.PipelineChat:       chatPipeline,
-			dispatcher.PipelineProject:    project_pipeline.NewPipeline(),
 			dispatcher.PipelineReflection: reflection_pipeline.NewPipeline(),
 		},
 		toolExecutor:   agentruntime.NewToolExecutor(registry),
 		contextBuilder: agentruntime.NewContextBuilder(),
 		model:          model,
 	}
+}
+
+func (a *Agent) SetProjectAgent(projectAgent ProjectAgent) {
+	a.projectAgent = projectAgent
 }
 
 func (a *Agent) Chat(ctx context.Context, input ChatInput) (*ChatOutput, error) {
@@ -43,11 +47,30 @@ func (a *Agent) Chat(ctx context.Context, input ChatInput) (*ChatOutput, error) 
 	if a == nil || a.dispatch == nil || a.toolExecutor == nil || a.contextBuilder == nil {
 		return nil, errors.New("agent runtime is not initialized")
 	}
+	decision := a.dispatch(message)
+	if decision.Pipeline == dispatcher.PipelineProject {
+		if a.projectAgent == nil {
+			return nil, errors.New("project agent is not initialized")
+		}
+		output, err := a.projectAgent.Invoke(ctx, project_pipeline.ProjectAgentInput{
+			Message: message, ProjectID: input.ProjectID, Days: input.Days, Limit: input.Limit,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &ChatOutput{
+			Answer:       output.Answer,
+			Intent:       decision.Intent,
+			Pipeline:     dispatcher.PipelineProject,
+			Project:      &output.Project,
+			UsedTools:    output.UsedTools,
+			Evidence:     output.Evidence,
+			RawToolCalls: output.RawToolCalls,
+		}, nil
+	}
 	if a.model == nil {
 		return nil, errors.New("agent summary model is not initialized")
 	}
-
-	decision := a.dispatch(message)
 	pipeline, ok := a.pipelines[decision.Pipeline]
 	if !ok || pipeline == nil {
 		return nil, fmt.Errorf("pipeline %q is not initialized", decision.Pipeline)
@@ -69,6 +92,7 @@ func (a *Agent) Chat(ctx context.Context, input ChatInput) (*ChatOutput, error) 
 	return &ChatOutput{
 		Answer:    strings.TrimSpace(answer),
 		Intent:    decision.Intent,
+		Pipeline:  decision.Pipeline,
 		UsedTools: usedTools,
 	}, nil
 }

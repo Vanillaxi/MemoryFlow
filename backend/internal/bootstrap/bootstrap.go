@@ -7,6 +7,7 @@ import (
 	"memoryflow/internal/ai/agent"
 	"memoryflow/internal/ai/agent/chat_pipeline"
 	"memoryflow/internal/ai/agent/knowledge_pipeline"
+	"memoryflow/internal/ai/agent/project_pipeline"
 	"memoryflow/internal/ai/embedder"
 	"memoryflow/internal/ai/models"
 	"memoryflow/internal/ai/reranker"
@@ -29,8 +30,9 @@ const DefaultConfigPath = "configs/config.yaml"
 type App struct {
 	Config *config.Config
 
-	MemoryService *service.MemoryService
-	TaskService   *service.TaskService
+	MemoryService  *service.MemoryService
+	TaskService    *service.TaskService
+	ProjectService *service.ProjectService
 
 	AnalysisChatModel    *models.ChatModel
 	ToolCallingChatModel *models.ArkToolCallingChatModel
@@ -66,6 +68,8 @@ func NewApp(ctx context.Context) (*App, error) {
 
 	taskRepo := repository.NewSQLiteTaskRepository(db)
 	taskService := service.NewTaskService(taskRepo)
+	projectRepo := repository.NewSQLiteProjectRepository(db)
+	projectService := service.NewProjectService(projectRepo)
 
 	analysisChatModel := models.NewChatModel(
 		cfg.Model.BaseURL,
@@ -132,12 +136,32 @@ func NewApp(ctx context.Context) (*App, error) {
 	}
 
 	toolRegistry := tools.NewToolRegistry()
-	toolRegistry.Register(systemtool.NewGetCurrentTimeTool())
-	toolRegistry.Register(memorytool.NewQueryLongTermMemoryTool(memoryRetriever, memoryService, nil))
+	currentTimeTool := systemtool.NewGetCurrentTimeTool()
+	queryMemoryTool := memorytool.NewQueryLongTermMemoryTool(memoryRetriever, memoryService, nil)
+	recentCommitsTool := githubtool.NewGetRecentCommitsTool(
+		cfg.Github.Token,
+		cfg.Github.DefaultLimit,
+		cfg.Github.DefaultDays,
+		"",
+		nil,
+	)
+	toolRegistry.Register(currentTimeTool)
+	toolRegistry.Register(queryMemoryTool)
 	toolRegistry.Register(memorytool.NewGetMemoryDetailTool(memoryService, nil))
 	toolRegistry.Register(memorytool.NewAggregateMemoryTool(memoryService, nil))
-	toolRegistry.Register(githubtool.NewGetRecentCommitsTool(nil))
+	toolRegistry.Register(recentCommitsTool)
 	pipelineAgent := agent.NewAgent(toolRegistry, analysisChatModel, chatPipeline)
+	projectAgent, err := project_pipeline.NewAgent(
+		ctx,
+		project_pipeline.NewProjectResolver(projectService),
+		toolCallingChatModel,
+		[]tools.Tool{currentTimeTool, queryMemoryTool, recentCommitsTool},
+	)
+	if err != nil {
+		_ = milvusStore.Close(ctx)
+		return nil, err
+	}
+	pipelineAgent.SetProjectAgent(projectAgent)
 
 	localStorage := storage.NewLocalStorage(cfg.Storage.UploadDir)
 
@@ -152,8 +176,9 @@ func NewApp(ctx context.Context) (*App, error) {
 	return &App{
 		Config: cfg,
 
-		MemoryService: memoryService,
-		TaskService:   taskService,
+		MemoryService:  memoryService,
+		TaskService:    taskService,
+		ProjectService: projectService,
 
 		AnalysisChatModel:    analysisChatModel,
 		ToolCallingChatModel: toolCallingChatModel,
