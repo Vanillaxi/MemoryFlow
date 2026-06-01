@@ -14,6 +14,12 @@ cd backend
 go run .
 ```
 
+访问地址：
+
+```text
+http://localhost:8080
+```
+
 构建服务：
 
 ```bash
@@ -131,3 +137,53 @@ RUN_INDEX=1 ./scripts/test_memoryflow.sh
 ```bash
 RUN_AI=1 RUN_INDEX=1 ./scripts/test_memoryflow.sh
 ```
+
+额外检查 Docker 镜像构建：
+
+```bash
+RUN_DOCKER=1 ./scripts/test_memoryflow.sh
+```
+
+默认测试不会执行 Docker build，避免拖慢日常验证。
+
+## Docker Compose
+
+启动 Docker Compose 服务：
+
+```bash
+docker compose up --build -d
+```
+
+访问地址：
+
+```text
+http://localhost:18080
+```
+
+Docker Compose 将宿主机的 `18080` 端口映射到容器内部的 `8080` 端口，避免和本地
+`go run .` 默认使用的 `8080` 端口冲突。
+
+排查 Docker 服务日志和外部 API 请求：
+
+```bash
+docker compose logs -f memoryflow-backend
+curl -s http://localhost:18080/api/agent/tools | jq
+curl -s "http://localhost:18080/api/memories/search?q=Docker&debug=true" | jq
+```
+
+Docker Compose 默认不注入代理环境变量，容器会直接访问外网。如果容器请求
+DashScope 或其他 OpenAI-compatible API 时出现 `EOF`、timeout、`connection reset`，
+可以按需在 `backend/.env` 中配置：
+
+```dotenv
+HTTP_PROXY=http://host.docker.internal:7897
+HTTPS_PROXY=http://host.docker.internal:7897
+NO_PROXY=localhost,127.0.0.1,host.docker.internal
+MILVUS_ADDRESS=host.docker.internal:19530
+```
+
+Clash Verge 端口以实际设置为准，当前示例使用 `7897`。Docker 容器应通过
+`host.docker.internal:7897` 访问宿主机代理，不要使用 `127.0.0.1:7897`。
+
+如果返回 `proxyconnect tcp ... connect: connection refused`，请在宿主机代理软件中
+启用 `Allow LAN` 或“允许局域网连接”等价选项，确保 Docker VM 可以访问代理端口。

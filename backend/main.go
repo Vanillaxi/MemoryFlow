@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
+	"strconv"
+	"strings"
 
 	"memoryflow/internal/api"
 	"memoryflow/internal/bootstrap"
@@ -36,6 +39,9 @@ func main() {
 	api.RegisterRoutes(r, memoryHandler, taskHandler, app.Config.Storage.UploadDir)
 
 	addr := fmt.Sprintf(":%d", app.Config.Server.Port)
+	if host := strings.TrimSpace(app.Config.Server.Host); host != "" {
+		addr = net.JoinHostPort(host, strconv.Itoa(app.Config.Server.Port))
+	}
 	if err := r.Run(addr); err != nil {
 		log.Fatalf("server run failed: %v", err)
 	}

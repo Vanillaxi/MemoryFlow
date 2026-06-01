@@ -72,6 +72,7 @@ cp configs/config.example.yaml configs/config.yaml
 
 ```yaml
 server:
+  host: "0.0.0.0"
   port: 8080
 
 database:
@@ -102,11 +103,14 @@ SQLite 数据目录会在首次启动时自动创建。Milvus 需要提前启动
 
 ### 3. 启动服务
 
-在 `backend/` 目录运行：
+本地启动正式 HTTP 服务：
 
 ```bash
+cd backend
 go run .
 ```
+
+正式服务入口是 `backend/main.go`，不需要运行 `cmd/` 下的调试入口。
 
 默认监听 `http://localhost:8080`。检查服务是否启动成功：
 
@@ -149,6 +153,92 @@ curl -s "http://localhost:8080/api/agent/tools"
 
 调试 trace 中可以看到 `get_current_time`、`query_long_term_memory`、
 `get_memory_detail` 等工具调用。
+
+### 6. 使用 Docker 启动
+
+构建 backend 镜像：
+
+```bash
+cd backend
+docker build -t memoryflow-backend .
+```
+
+使用 Docker 启动：
+
+```bash
+docker run --rm -p 8080:8080 \
+  --add-host host.docker.internal:host-gateway \
+  -v "$(pwd)/memoryflow-data:/app/memoryflow-data" \
+  -v "$(pwd)/configs/config.yaml:/app/configs/config.yaml:ro" \
+  memoryflow-backend
+```
+
+当前 Docker 配置只启动 backend。Milvus 仍然是外部依赖；如果 Milvus 运行在宿主机，
+请在本地 `configs/config.yaml` 中将地址设置为 `host.docker.internal:19530`。
+
+使用 Docker Compose 启动：
+
+```bash
+cd backend
+docker compose up --build -d
+curl -s http://localhost:18080/api/agent/tools | jq
+```
+
+Docker Compose 将宿主机的 `18080` 端口映射到容器内部的 `8080` 端口。这样可以避免
+与本地开发时运行的 `go run .` 冲突。
+
+停止 Docker Compose 服务：
+
+```bash
+docker compose down
+```
+
+本地开发服务仍然使用 `http://localhost:8080`，Docker Compose 服务使用
+`http://localhost:18080`，容器内部服务端口仍然是 `8080`。
+
+Compose 支持通过本地 `.env` 注入容器环境变量。当前后端的模型 API Key 仍然从本地
+`configs/config.yaml` 读取。`.env` 和真实配置都不要提交到仓库。
+`memoryflow-data` 是持久化数据目录，不会打入镜像。
+
+### Docker 排查
+
+Docker 容器内的服务应监听 `0.0.0.0:8080`，而不是 `127.0.0.1:8080`。默认配置为：
+
+```yaml
+server:
+  host: "0.0.0.0"
+  port: 8080
+```
+
+如果容器已启动但接口无法访问，还需要检查 Milvus 地址。容器内的 `localhost`
+指向容器自身；当 Milvus 运行在宿主机时，应在本地 `configs/config.yaml` 中配置：
+
+```yaml
+milvus:
+  address: "host.docker.internal:19530"
+```
+
+Docker Compose 默认通过 `MILVUS_ADDRESS=host.docker.internal:19530` 覆盖该地址。
+如果 Milvus 运行在其他位置，可以在本地 `.env` 中设置 `MILVUS_ADDRESS`。
+
+Docker Compose 默认不注入代理环境变量，容器会直接访问外网。如果容器内请求
+DashScope 或其他 OpenAI-compatible API 时出现 `EOF`、timeout、`connection reset`，
+可以按需在 `backend/.env` 中配置宿主机代理。
+Clash Verge 端口以本地实际设置为准，当前示例使用 `7897`：
+
+```dotenv
+HTTP_PROXY=http://host.docker.internal:7897
+HTTPS_PROXY=http://host.docker.internal:7897
+NO_PROXY=localhost,127.0.0.1,host.docker.internal
+MILVUS_ADDRESS=host.docker.internal:19530
+```
+
+Docker 容器访问宿主机代理应使用 `host.docker.internal:7897`，不要在容器内使用
+`127.0.0.1:7897`。`.env` 包含本地运行配置，不要提交到仓库。
+
+如果进一步出现 `proxyconnect tcp ... connect: connection refused`，说明容器已经
+尝试连接宿主机代理，但代理端口没有对 Docker VM 开放。请在 Clash Verge 中启用
+`Allow LAN` 或“允许局域网连接”等价选项，并确认代理监听地址不是仅限 `127.0.0.1`。
 
 ## 调试命令
 
@@ -195,6 +285,12 @@ RUN_AI=1 ./scripts/test_memoryflow.sh
 
 ```bash
 RUN_INDEX=1 ./scripts/test_memoryflow.sh
+```
+
+需要额外检查 Docker 镜像构建时：
+
+```bash
+RUN_DOCKER=1 ./scripts/test_memoryflow.sh
 ```
 
 ## 常用 API

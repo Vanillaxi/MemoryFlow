@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -16,7 +17,8 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Port int `mapstructure:"port"`
+	Host string `mapstructure:"host"`
+	Port int    `mapstructure:"port"`
 }
 
 type DatabaseConfig struct {
@@ -52,10 +54,21 @@ func LoadConfig(path string) (*Config, error) {
 	v.SetConfigFile(path)
 	v.SetConfigType("yaml")
 
+	v.SetDefault("server.host", "0.0.0.0")
 	v.SetDefault("server.port", 8080)
 	v.SetDefault("database.driver", "sqlite")
 	v.SetDefault("database.dsn", "../memoryflow-data/data/memoryflow.db")
 	v.SetDefault("stroage.upload_dir", "../memoryflow-data/uploads")
+
+	for key, env := range map[string]string{
+		"server.host":    "SERVER_HOST",
+		"server.port":    "SERVER_PORT",
+		"milvus.address": "MILVUS_ADDRESS",
+	} {
+		if err := v.BindEnv(key, env); err != nil {
+			return nil, fmt.Errorf("bind config env %s failed: %w", strings.ToUpper(env), err)
+		}
+	}
 
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("read config failed: %w", err)

@@ -1,0 +1,26 @@
+services:
+  memoryflow-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      # Host 18080 -> container 8080. This avoids conflict with local `go run .` on 8080.
+      - "18080:8080"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      GIN_MODE: ${GIN_MODE:-release}
+      TZ: ${TZ:-Asia/Shanghai}
+      SERVER_HOST: ${SERVER_HOST:-0.0.0.0}
+      SERVER_PORT: ${SERVER_PORT:-8080}
+      MILVUS_ADDRESS: ${MILVUS_ADDRESS:-host.docker.internal:19530}
+    volumes:
+      - ./memoryflow-data:/app/memoryflow-data
+      # This file may contain API keys. Keep real credentials local.
+      - ./configs/config.yaml:/app/configs/config.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+# Milvus remains an external dependency. milvus/etcd/minio services can be added later.

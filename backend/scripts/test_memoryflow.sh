@@ -35,6 +35,11 @@ if [[ "${RUN_INDEX:-0}" == "1" ]]; then
   go run ./cmd/knowledge_cmd --batch-size=50
 fi
 
+if [[ "${RUN_DOCKER:-0}" == "1" ]]; then
+  section "Building Docker image"
+  docker build -t memoryflow-backend:test .
+fi
+
 section "Cleaning build artifacts"
 rm -f memoryflow chat_cmd knowledge_cmd
 
