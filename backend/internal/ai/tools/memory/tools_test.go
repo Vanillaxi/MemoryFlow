@@ -1,4 +1,4 @@
-package tools
+package memory
 
 import (
 	"context"
@@ -14,13 +14,6 @@ type missingMemoryService struct {
 
 func (missingMemoryService) GetByID(context.Context, uint) (*model.MemoryItem, error) {
 	return nil, errors.New("memory not found")
-}
-
-func TestGetCurrentTimeReturnsNowDateAndTimezone(t *testing.T) {
-	output := GetCurrentTime()
-	if output.Now.IsZero() || output.Date == "" || output.TimeZone == "" {
-		t.Fatalf("unexpected current time: %#v", output)
-	}
 }
 
 func TestGetMemoryDetailValidatesMemoryID(t *testing.T) {
@@ -48,5 +41,20 @@ func TestQueryLongTermMemoryToolEmitsTrace(t *testing.T) {
 	}
 	if len(events) != 2 || events[0] != ToolQueryLongTermMemory+":tool_start" || events[1] != ToolQueryLongTermMemory+":tool_end" {
 		t.Fatalf("unexpected events: %#v", events)
+	}
+}
+
+func TestAggregateMemoryToolReturnsJSON(t *testing.T) {
+	service := &fakeMemoryService{rangeItems: []*model.MemoryItem{{ID: 1, Summary: "完成 Tool MVP"}}}
+	currentTool := NewAggregateMemoryTool(service, nil)
+	output, err := currentTool.Call(context.Background(), map[string]any{
+		"from": "2026-05-01",
+		"to":   "2026-05-31",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if output == "" {
+		t.Fatal("expected aggregate output")
 	}
 }

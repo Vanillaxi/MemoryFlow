@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	memorytools "memoryflow/internal/ai/tools"
+	memorytool "memoryflow/internal/ai/tools/memory"
 )
 
 const SystemPrompt = `
@@ -25,7 +25,7 @@ const SystemPrompt = `
 9. 如果需要调用工具，请直接发起 tool call，不要先输出解释性文本。
 `
 
-func BuildSummaryPrompt(from, to time.Time, aggregation memorytools.MemoryAggregation) string {
+func BuildSummaryPrompt(from, to time.Time, aggregation memorytool.MemoryAggregation) string {
 	limitedEvidence := ""
 	if aggregation.Count < 3 {
 		limitedEvidence = "当前记忆数量较少，请明确说明总结依据有限。\n"

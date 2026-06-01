@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+// 保存到本地磁盘，并生成前端可访问URL
 type LocalStorage struct {
 	UploadDir string
 }

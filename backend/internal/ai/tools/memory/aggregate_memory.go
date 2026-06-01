@@ -1,6 +1,7 @@
-package tools
+package memory
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -14,6 +15,23 @@ const (
 	maxHighlights        = 5
 	maxAggregationValues = 10
 )
+
+func AggregateMemory(ctx context.Context, memoryService MemoryService, input AggregateMemoryInput) (*MemoryAggregation, error) {
+	from, to, err := parseDateRange(input.From, input.To)
+	if err != nil {
+		return nil, err
+	}
+	from, to, err = defaultDateRange(from, to)
+	if err != nil {
+		return nil, err
+	}
+	memories, err := memoryService.ListByTimeRange(ctx, *from, *to, normalizeLimit(input.Limit))
+	if err != nil {
+		return nil, err
+	}
+	aggregation := AggregateMemories(memories)
+	return &aggregation, nil
+}
 
 func AggregateMemories(memories []*model.MemoryItem) MemoryAggregation {
 	items := make([]*model.MemoryItem, 0, len(memories))
@@ -75,11 +93,11 @@ func AggregateMemories(memories []*model.MemoryItem) MemoryAggregation {
 }
 
 type MemoryAggregation struct {
-	Count      int
-	Tags       []string
-	Moods      []string
-	Highlights []string
-	MemoryList string
+	Count      int      `json:"count"`
+	Tags       []string `json:"tags"`
+	Moods      []string `json:"moods"`
+	Highlights []string `json:"highlights"`
+	MemoryList string   `json:"memory_list"`
 }
 
 func parseTags(raw string) []string {

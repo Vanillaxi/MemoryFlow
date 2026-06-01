@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	memorytools "memoryflow/internal/ai/tools"
+	memorytool "memoryflow/internal/ai/tools/memory"
 	"memoryflow/internal/domain/model"
 )
 
@@ -68,7 +68,7 @@ func TestBuildSummaryPromptKeepsEvidenceConstraints(t *testing.T) {
 	got := BuildSummaryPrompt(
 		summaryTestFrom(),
 		summaryTestTo(),
-		memorytools.MemoryAggregation{Count: 2, Highlights: []string{"完成测试"}, MemoryList: "- memory"},
+		memorytool.MemoryAggregation{Count: 2, Highlights: []string{"完成测试"}, MemoryList: "- memory"},
 	)
 	for _, want := range []string{"不要编造", "依据有限", "完成测试"} {
 		if !strings.Contains(got, want) {

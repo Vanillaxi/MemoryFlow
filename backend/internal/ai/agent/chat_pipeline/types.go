@@ -3,12 +3,12 @@ package chat_pipeline
 import (
 	"time"
 
-	memorytools "memoryflow/internal/ai/tools"
+	memorytool "memoryflow/internal/ai/tools/memory"
 )
 
-type MemoryRetriever = memorytools.MemoryRetriever
+type MemoryRetriever = memorytool.MemoryRetriever
 
-type MemoryService = memorytools.MemoryService
+type MemoryService = memorytool.MemoryService
 
 type ChatInput struct {
 	Message   string     `json:"message"`

@@ -2,7 +2,7 @@ package api
 
 import "github.com/gin-gonic/gin"
 
-func RegisterRoutes(r *gin.Engine, memoryHandler *MemoryHandler, taskHandler *TaskHandler, uploadDir string) {
+func RegisterRoutes(r *gin.Engine, memoryHandler *MemoryHandler, taskHandler *TaskHandler, agentHandler *AgentHandler, uploadDir string) {
 	r.GET("health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"status": "ok",
@@ -11,6 +11,7 @@ func RegisterRoutes(r *gin.Engine, memoryHandler *MemoryHandler, taskHandler *Ta
 
 	//加静态文件映射，使得前端能通过浏览器访问
 	r.Static("/uploads", uploadDir)
+	r.POST("/agent/chat", agentHandler.Chat)
 
 	api := r.Group("/api")
 	{

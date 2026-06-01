@@ -3,7 +3,8 @@ package chat_pipeline
 import (
 	"context"
 
-	memorytools "memoryflow/internal/ai/tools"
+	memorytool "memoryflow/internal/ai/tools/memory"
+	systemtool "memoryflow/internal/ai/tools/system"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
@@ -11,9 +12,10 @@ import (
 
 func (p *Pipeline) BaseTools() []tool.BaseTool {
 	return []tool.BaseTool{
-		memorytools.NewGetCurrentTimeTool(traceExternalTool),
-		memorytools.NewQueryLongTermMemoryTool(p.memoryRetriever, p.memoryService, traceExternalTool),
-		memorytools.NewGetMemoryDetailTool(p.memoryService, traceExternalTool),
+		systemtool.NewGetCurrentTimeTool(traceExternalTool),
+		memorytool.NewQueryLongTermMemoryTool(p.memoryRetriever, p.memoryService, traceExternalTool),
+		memorytool.NewGetMemoryDetailTool(p.memoryService, traceExternalTool),
+		memorytool.NewAggregateMemoryTool(p.memoryService, traceExternalTool),
 	}
 }
 

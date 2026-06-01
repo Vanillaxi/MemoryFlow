@@ -4,12 +4,17 @@ import (
 	"context"
 	"log"
 
+	"memoryflow/internal/ai/agent"
 	"memoryflow/internal/ai/agent/chat_pipeline"
 	"memoryflow/internal/ai/agent/knowledge_pipeline"
 	"memoryflow/internal/ai/embedder"
 	"memoryflow/internal/ai/models"
 	"memoryflow/internal/ai/reranker"
 	"memoryflow/internal/ai/retriever"
+	"memoryflow/internal/ai/tools"
+	githubtool "memoryflow/internal/ai/tools/github"
+	memorytool "memoryflow/internal/ai/tools/memory"
+	systemtool "memoryflow/internal/ai/tools/system"
 	"memoryflow/internal/ai/vectorstore"
 	"memoryflow/internal/ai/workflow/memory_analyze"
 	"memoryflow/internal/config"
@@ -39,6 +44,7 @@ type App struct {
 
 	ChatPipeline      *chat_pipeline.Pipeline
 	KnowledgePipeline *knowledge_pipeline.Pipeline
+	Agent             *agent.Agent
 
 	Storage *storage.LocalStorage
 	Worker  *task.Worker
@@ -125,6 +131,14 @@ func NewApp(ctx context.Context) (*App, error) {
 		return nil, err
 	}
 
+	toolRegistry := tools.NewToolRegistry()
+	toolRegistry.Register(systemtool.NewGetCurrentTimeTool())
+	toolRegistry.Register(memorytool.NewQueryLongTermMemoryTool(memoryRetriever, memoryService, nil))
+	toolRegistry.Register(memorytool.NewGetMemoryDetailTool(memoryService, nil))
+	toolRegistry.Register(memorytool.NewAggregateMemoryTool(memoryService, nil))
+	toolRegistry.Register(githubtool.NewGetRecentCommitsTool(nil))
+	pipelineAgent := agent.NewAgent(toolRegistry, analysisChatModel, chatPipeline)
+
 	localStorage := storage.NewLocalStorage(cfg.Storage.UploadDir)
 
 	worker := task.NewWorker(
@@ -153,6 +167,7 @@ func NewApp(ctx context.Context) (*App, error) {
 
 		ChatPipeline:      chatPipeline,
 		KnowledgePipeline: knowledgePipeline,
+		Agent:             pipelineAgent,
 
 		Storage: localStorage,
 		Worker:  worker,

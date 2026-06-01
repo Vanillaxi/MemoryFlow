@@ -34,7 +34,7 @@ func TestListAgentToolsOnlyReturnsExternalCapabilities(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := []string{"get_current_time", "query_long_term_memory", "get_memory_detail"}
+	want := []string{"get_current_time", "query_long_term_memory", "get_memory_detail", "aggregate_memory"}
 	if len(response.Data) != len(want) {
 		t.Fatalf("len(tools) = %d, want %d: %s", len(response.Data), len(want), recorder.Body.String())
 	}

@@ -6,14 +6,15 @@ import (
 	"strings"
 	"testing"
 
-	memorytools "memoryflow/internal/ai/tools"
+	memorytool "memoryflow/internal/ai/tools/memory"
+	systemtool "memoryflow/internal/ai/tools/system"
 
 	"github.com/cloudwego/eino/components/tool"
 )
 
 func TestBaseToolsOnlyExposeExternalActions(t *testing.T) {
 	tools := (&Pipeline{}).BaseTools()
-	want := []string{memorytools.ToolGetCurrentTime, memorytools.ToolQueryLongTermMemory, memorytools.ToolGetMemoryDetail}
+	want := []string{systemtool.ToolGetCurrentTime, memorytool.ToolQueryLongTermMemory, memorytool.ToolGetMemoryDetail, memorytool.ToolAggregateMemory}
 	if len(tools) != len(want) {
 		t.Fatalf("len(BaseTools()) = %d, want %d", len(tools), len(want))
 	}
@@ -63,7 +64,7 @@ func TestToolTraceUsesExternalToolName(t *testing.T) {
 	}
 
 	steps := collector.Trace().Steps
-	if len(steps) != 2 || steps[0].Node != memorytools.ToolGetCurrentTime || steps[0].Event != "tool_start" || steps[1].Event != "tool_end" {
+	if len(steps) != 2 || steps[0].Node != systemtool.ToolGetCurrentTime || steps[0].Event != "tool_start" || steps[1].Event != "tool_end" {
 		t.Fatalf("unexpected trace: %#v", steps)
 	}
 }

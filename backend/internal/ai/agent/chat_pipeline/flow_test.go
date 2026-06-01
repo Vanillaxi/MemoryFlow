@@ -90,7 +90,7 @@ func TestChatPipelineRunsReActToolLoopWithFakes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if output.Answer != modelClient.answer || modelClient.calls != 2 || len(modelClient.boundToolName) != 3 {
+	if output.Answer != modelClient.answer || modelClient.calls != 2 || len(modelClient.boundToolName) != 4 {
 		t.Fatalf("unexpected output=%#v model=%#v", output, modelClient)
 	}
 }

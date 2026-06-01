@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	memorytools "memoryflow/internal/ai/tools"
+	memorytool "memoryflow/internal/ai/tools/memory"
 )
 
 const defaultSummaryLimit = 100
@@ -32,7 +32,7 @@ func (p *Pipeline) Summarize(ctx context.Context, input SummaryInput) (*SummaryO
 		return nil, err
 	}
 
-	aggregation := memorytools.AggregateMemories(memories)
+	aggregation := memorytool.AggregateMemories(memories)
 	output := &SummaryOutput{
 		From:       input.From,
 		To:         input.To,
