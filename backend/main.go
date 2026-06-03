@@ -39,11 +39,16 @@ func main() {
 
 	r := gin.Default()
 	api.RegisterRoutes(r, memoryHandler, taskHandler, projectHandler, agentHandler, app.Config.Storage.UploadDir)
+	log.Printf("MemoryFlow config loaded from %s", bootstrap.DefaultConfigPath)
+	log.Println("MemoryFlow routes: POST /agent/chat, POST /projects, GET /projects")
 
 	addr := fmt.Sprintf(":%d", app.Config.Server.Port)
 	if host := strings.TrimSpace(app.Config.Server.Host); host != "" {
-		addr = net.JoinHostPort(host, strconv.Itoa(app.Config.Server.Port))
+		if host != "0.0.0.0" {
+			addr = net.JoinHostPort(host, strconv.Itoa(app.Config.Server.Port))
+		}
 	}
+	log.Printf("MemoryFlow server listening on %s", addr)
 	if err := r.Run(addr); err != nil {
 		log.Fatalf("server run failed: %v", err)
 	}

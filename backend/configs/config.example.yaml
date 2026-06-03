@@ -9,8 +9,6 @@ database:
 storage:
   upload_dir: ../memoryflow-data/uploads
 
-
-
 model:
   base_url: "https://xxx/v1"
   api_key: "你本地的key"

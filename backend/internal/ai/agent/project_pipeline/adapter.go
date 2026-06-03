@@ -81,11 +81,22 @@ func (a *Adapter) InvokableRun(ctx context.Context, argumentsInJSON string, _ ..
 		call := ToolCallLog{Name: a.tool.Name(), Args: args, Result: result}
 		if err != nil {
 			call.Error = err.Error()
-			call.Result = ""
+			call.Result = toolErrorResult(err)
 		}
 		scope.recorder.add(call)
 	}
-	return result, err
+	if err != nil {
+		return toolErrorResult(err), nil
+	}
+	return result, nil
+}
+
+func toolErrorResult(err error) string {
+	bytes, marshalErr := json.Marshal(map[string]string{"error": err.Error()})
+	if marshalErr != nil {
+		return `{"error":"tool failed"}`
+	}
+	return string(bytes)
 }
 
 func sanitizeToolArgs(args map[string]any) map[string]any {

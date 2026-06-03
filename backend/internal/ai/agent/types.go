@@ -21,6 +21,7 @@ type ChatInput struct {
 	ProjectID *uint  `json:"project_id,omitempty"`
 	Days      int    `json:"days,omitempty"`
 	Limit     int    `json:"limit,omitempty"`
+	Pipeline  string `json:"pipeline,omitempty"`
 }
 
 type ChatOutput struct {

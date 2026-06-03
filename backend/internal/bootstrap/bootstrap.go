@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"context"
 	"log"
+	"time"
 
 	"memoryflow/internal/ai/agent"
 	"memoryflow/internal/ai/agent/chat_pipeline"
@@ -26,6 +27,8 @@ import (
 )
 
 const DefaultConfigPath = "configs/config.yaml"
+
+const milvusStartupTimeout = 3 * time.Second
 
 type App struct {
 	Config *config.Config
@@ -85,20 +88,24 @@ func NewApp(ctx context.Context) (*App, error) {
 
 	memoryAnalyzeWorkflow := memory_analyze.NewWorkflow(analysisChatModel)
 
-	milvusStore, err := vectorstore.NewMilvusStore(
-		ctx,
+	var milvusStore *vectorstore.MilvusStore
+	vectorStoreForRuntime := any(vectorstore.NewDisabledStore())
+	milvusCtx, cancelMilvus := context.WithTimeout(ctx, milvusStartupTimeout)
+	if store, err := vectorstore.NewMilvusStore(
+		milvusCtx,
 		cfg.Milvus.Address,
 		cfg.Milvus.Collection,
 		cfg.Embedding.Dim,
-	)
-	if err != nil {
-		return nil, err
+	); err != nil {
+		log.Printf("[bootstrap] milvus unavailable, vector features disabled: %v", err)
+	} else if err := store.EnsureCollection(milvusCtx); err != nil {
+		_ = store.Close(context.Background())
+		log.Printf("[bootstrap] milvus unavailable, vector features disabled: %v", err)
+	} else {
+		milvusStore = store
+		vectorStoreForRuntime = store
 	}
-
-	if err := milvusStore.EnsureCollection(ctx); err != nil {
-		_ = milvusStore.Close(ctx)
-		return nil, err
-	}
+	cancelMilvus()
 
 	embeddingClient := embedder.NewClient(
 		cfg.Embedding.BaseURL,
@@ -109,7 +116,7 @@ func NewApp(ctx context.Context) (*App, error) {
 
 	memoryRetriever := chat_pipeline.NewRetriever(
 		embeddingClient,
-		milvusStore,
+		vectorStoreForRuntime.(retriever.VectorStore),
 		memoryService,
 	)
 
@@ -119,7 +126,10 @@ func NewApp(ctx context.Context) (*App, error) {
 		knowledge_pipeline.NewLoader(memoryService),
 		knowledge_pipeline.NewIndexer(
 			embeddingClient,
-			milvusStore,
+			vectorStoreForRuntime.(interface {
+				DeleteMemoryVector(context.Context, int64) error
+				InsertMemoryVector(context.Context, vectorstore.MemoryVector) error
+			}),
 		),
 	)
 
@@ -165,13 +175,18 @@ func NewApp(ctx context.Context) (*App, error) {
 
 	localStorage := storage.NewLocalStorage(cfg.Storage.UploadDir)
 
-	worker := task.NewWorker(
-		taskService,
-		memoryService,
-		memoryAnalyzeWorkflow,
-		embeddingClient,
-		milvusStore,
-	)
+	var worker *task.Worker
+	if milvusStore != nil {
+		worker = task.NewWorker(
+			taskService,
+			memoryService,
+			memoryAnalyzeWorkflow,
+			embeddingClient,
+			milvusStore,
+		)
+	} else {
+		log.Printf("[bootstrap] task worker disabled because milvus is unavailable")
+	}
 
 	return &App{
 		Config: cfg,

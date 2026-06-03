@@ -48,6 +48,12 @@ func (a *Agent) Chat(ctx context.Context, input ChatInput) (*ChatOutput, error) 
 		return nil, errors.New("agent runtime is not initialized")
 	}
 	decision := a.dispatch(message)
+	switch input.Pipeline {
+	case dispatcher.PipelineChat:
+		decision.Pipeline = dispatcher.PipelineChat
+	case dispatcher.PipelineProject:
+		decision.Pipeline = dispatcher.PipelineProject
+	}
 	if decision.Pipeline == dispatcher.PipelineProject {
 		if a.projectAgent == nil {
 			return nil, errors.New("project agent is not initialized")
