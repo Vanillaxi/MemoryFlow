@@ -66,9 +66,9 @@ func (a *Adapter) InvokableRun(ctx context.Context, argumentsInJSON string, _ ..
 	}
 	args = sanitizeToolArgs(args)
 	scope, _ := ctx.Value(executionScopeKey{}).(*executionScope)
-	if scope != nil && a.tool.Name() == githubtool.ToolGetRecentCommits {
+	if scope != nil && isProjectGitHubTool(a.tool.Name()) {
 		args["repository"] = scope.repository
-		if scope.days > 0 {
+		if scope.days > 0 && a.tool.Name() != githubtool.ToolGetPullRequests {
 			args["days"] = scope.days
 		}
 		if scope.limit > 0 {
@@ -89,6 +89,15 @@ func (a *Adapter) InvokableRun(ctx context.Context, argumentsInJSON string, _ ..
 		return toolErrorResult(err), nil
 	}
 	return result, nil
+}
+
+func isProjectGitHubTool(name string) bool {
+	switch name {
+	case githubtool.ToolGetRecentCommits, githubtool.ToolGetRecentIssues, githubtool.ToolGetPullRequests:
+		return true
+	default:
+		return false
+	}
 }
 
 func toolErrorResult(err error) string {
@@ -123,6 +132,27 @@ func parametersFor(name string) map[string]*schema.ParameterInfo {
 			"limit":      {Type: schema.Integer, Desc: "返回数量，可选，最大 20。"},
 			"days":       {Type: schema.Integer, Desc: "最近天数，可选。"},
 			"since":      {Type: schema.String, Desc: "RFC3339 时间，可选；优先于 days。"},
+		}
+	case githubtool.ToolGetRecentIssues:
+		return map[string]*schema.ParameterInfo{
+			"repository": {Type: schema.String, Desc: "仓库 owner/repo。由当前项目上下文提供。", Required: true},
+			"state":      {Type: schema.String, Desc: "issue 状态：open/closed/all，可选，默认 open。"},
+			"limit":      {Type: schema.Integer, Desc: "返回数量，可选，最大 20。"},
+			"days":       {Type: schema.Integer, Desc: "最近天数，可选。"},
+			"since":      {Type: schema.String, Desc: "RFC3339 时间，可选；优先于 days。"},
+			"labels":     {Type: schema.String, Desc: "逗号分隔 labels，可选。"},
+			"sort":       {Type: schema.String, Desc: "created/updated/comments，可选，默认 updated。"},
+			"direction":  {Type: schema.String, Desc: "asc/desc，可选，默认 desc。"},
+		}
+	case githubtool.ToolGetPullRequests:
+		return map[string]*schema.ParameterInfo{
+			"repository": {Type: schema.String, Desc: "仓库 owner/repo。由当前项目上下文提供。", Required: true},
+			"state":      {Type: schema.String, Desc: "PR 状态：open/closed/all，可选，默认 open。"},
+			"limit":      {Type: schema.Integer, Desc: "返回数量，可选，最大 20。"},
+			"sort":       {Type: schema.String, Desc: "created/updated/popularity/long-running，可选，默认 updated。"},
+			"direction":  {Type: schema.String, Desc: "asc/desc，可选，默认 desc。"},
+			"base":       {Type: schema.String, Desc: "目标分支，可选。"},
+			"head":       {Type: schema.String, Desc: "来源分支或 user:branch，可选。"},
 		}
 	case memorytool.ToolQueryLongTermMemory:
 		return map[string]*schema.ParameterInfo{

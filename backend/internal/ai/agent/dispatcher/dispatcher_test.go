@@ -9,6 +9,10 @@ func TestDispatch(t *testing.T) {
 		pipeline string
 	}{
 		{message: "我的 MemoryFlow 最近做到哪了？", intent: IntentProjectProgress, pipeline: PipelineProject},
+		{message: "MemoryFlow 还有哪些 issue 没处理？", intent: IntentProjectIssueStatus, pipeline: PipelineProject},
+		{message: "MemoryFlow 最近有哪些 PR？", intent: IntentProjectPRStatus, pipeline: PipelineProject},
+		{message: "MemoryFlow 有哪些 pull requests 需要 review？", intent: IntentProjectPRStatus, pipeline: PipelineProject},
+		{message: "MemoryFlow 有哪些待处理风险？", intent: IntentProjectIssueStatus, pipeline: PipelineProject},
 		{message: "我之前记录了什么记忆？", intent: IntentMemoryQuery, pipeline: PipelineChat},
 		{message: "帮我整理一份 codex 交接总结", intent: IntentHandoff, pipeline: PipelineProject},
 		{message: "你好", intent: IntentGeneral, pipeline: PipelineChat},

@@ -1,10 +1,12 @@
 package dispatcher
 
 const (
-	IntentProjectProgress = "project_progress"
-	IntentMemoryQuery     = "memory_query"
-	IntentHandoff         = "handoff"
-	IntentGeneral         = "general"
+	IntentProjectProgress    = "project_progress"
+	IntentProjectIssueStatus = "project_issue_status"
+	IntentProjectPRStatus    = "project_pr_status"
+	IntentMemoryQuery        = "memory_query"
+	IntentHandoff            = "handoff"
+	IntentGeneral            = "general"
 )
 
 const (

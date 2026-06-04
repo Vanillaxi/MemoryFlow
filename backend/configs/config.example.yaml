@@ -25,6 +25,11 @@ milvus:
   collection: "memoryflow_memories"
 
 github:
+  # Fine-grained GitHub token 建议只读权限：
+  # - Contents: Read-only，用于 commits
+  # - Issues: Read-only，用于 issues
+  # - Pull requests: Read-only，用于 PR
+  # - Metadata: Read-only，GitHub 默认需要
   token: ""
   default_limit: 10
   default_days: 7

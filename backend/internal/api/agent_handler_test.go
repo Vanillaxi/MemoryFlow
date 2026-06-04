@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"memoryflow/internal/ai/agent"
 	"memoryflow/internal/ai/agent/project_pipeline"
 	agentruntime "memoryflow/internal/ai/agent/runtime"
 	memorytools "memoryflow/internal/ai/tools"
+	githubtools "memoryflow/internal/ai/tools/github"
 	systemtool "memoryflow/internal/ai/tools/system"
 	"memoryflow/internal/domain/model"
 
@@ -26,13 +28,21 @@ func (fakeAgentTool) Call(context.Context, map[string]any) (string, error) {
 	return `{"date":"2026-06-01"}`, nil
 }
 
-type fakeAPIProjectAgent struct{}
+type dynamicAPIProjectAgent struct{}
 
-func (fakeAPIProjectAgent) Invoke(context.Context, project_pipeline.ProjectAgentInput) (*project_pipeline.ProjectAgentOutput, error) {
+func (dynamicAPIProjectAgent) Invoke(_ context.Context, input project_pipeline.ProjectAgentInput) (*project_pipeline.ProjectAgentOutput, error) {
+	tool := githubtools.ToolGetRecentCommits
+	normalized := strings.ToLower(input.Message)
+	if strings.Contains(normalized, "issue") || strings.Contains(normalized, "未处理") || strings.Contains(normalized, "待处理") {
+		tool = githubtools.ToolGetRecentIssues
+	}
+	if strings.Contains(normalized, "pr") || strings.Contains(normalized, "pull request") {
+		tool = githubtools.ToolGetPullRequests
+	}
 	return &project_pipeline.ProjectAgentOutput{
 		Answer:    "项目进展",
 		Project:   model.Project{Name: "MemoryFlow", RepoOwner: "vanillaxi", RepoName: "MemoryFlow"},
-		UsedTools: []string{"get_recent_commits"},
+		UsedTools: []string{tool},
 	}, nil
 }
 
@@ -45,7 +55,7 @@ func (fakeAgentSummaryModel) GenerateWithSystem(context.Context, string, string)
 func TestAgentChatRoutesProjectQuestionToProjectPipeline(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	currentAgent := agent.NewAgent(memorytools.NewToolRegistry(), fakeAgentSummaryModel{}, fakeAgentPipeline{})
-	currentAgent.SetProjectAgent(fakeAPIProjectAgent{})
+	currentAgent.SetProjectAgent(dynamicAPIProjectAgent{})
 	router := gin.New()
 	router.POST("/agent/chat", NewAgentHandler(currentAgent).Chat)
 
@@ -61,6 +71,66 @@ func TestAgentChatRoutesProjectQuestionToProjectPipeline(t *testing.T) {
 	if recorder.Code != http.StatusOK || output.Pipeline != "project_pipeline" || output.Project == nil || output.Project.Name != "MemoryFlow" {
 		t.Fatalf("status=%d output=%#v", recorder.Code, output)
 	}
+}
+
+func TestAgentChatRoutesIssueQuestionToProjectPipeline(t *testing.T) {
+	output := postAgentChat(t, `{"message":"MemoryFlow 还有哪些 issue 没处理？"}`)
+	if output.Pipeline != "project_pipeline" || output.Intent != "project_issue_status" || !containsTool(output.UsedTools, githubtools.ToolGetRecentIssues) {
+		t.Fatalf("unexpected output: %#v", output)
+	}
+}
+
+func TestAgentChatRoutesPRQuestionToProjectPipeline(t *testing.T) {
+	output := postAgentChat(t, `{"message":"MemoryFlow 最近有哪些 PR？"}`)
+	if output.Pipeline != "project_pipeline" || output.Intent != "project_pr_status" || !containsTool(output.UsedTools, githubtools.ToolGetPullRequests) {
+		t.Fatalf("unexpected output: %#v", output)
+	}
+}
+
+func TestAgentChatRoutesProgressQuestionToProjectPipeline(t *testing.T) {
+	output := postAgentChat(t, `{"message":"我的 MemoryFlow 最近做到哪了？"}`)
+	if output.Pipeline != "project_pipeline" || output.Intent != "project_progress" || !containsTool(output.UsedTools, githubtools.ToolGetRecentCommits) {
+		t.Fatalf("unexpected output: %#v", output)
+	}
+}
+
+func TestAgentChatExplicitProjectPipelineOverride(t *testing.T) {
+	output := postAgentChat(t, `{"message":"你好","pipeline":"project"}`)
+	if output.Pipeline != "project_pipeline" || output.Intent != "project_progress" {
+		t.Fatalf("unexpected output: %#v", output)
+	}
+}
+
+func postAgentChat(t *testing.T, body string) agent.ChatOutput {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	currentAgent := agent.NewAgent(memorytools.NewToolRegistry(), fakeAgentSummaryModel{}, fakeAgentPipeline{})
+	currentAgent.SetProjectAgent(dynamicAPIProjectAgent{})
+	router := gin.New()
+	router.POST("/agent/chat", NewAgentHandler(currentAgent).Chat)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/agent/chat", bytes.NewBufferString(body))
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(recorder, request)
+
+	var output agent.ChatOutput
+	if err := json.Unmarshal(recorder.Body.Bytes(), &output); err != nil {
+		t.Fatal(err)
+	}
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status=%d output=%#v body=%s", recorder.Code, output, recorder.Body.String())
+	}
+	return output
+}
+
+func containsTool(tools []string, want string) bool {
+	for _, tool := range tools {
+		if tool == want {
+			return true
+		}
+	}
+	return false
 }
 
 type fakeAgentPipeline struct{}

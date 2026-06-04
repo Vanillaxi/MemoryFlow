@@ -155,17 +155,33 @@ func NewApp(ctx context.Context) (*App, error) {
 		"",
 		nil,
 	)
+	recentIssuesTool := githubtool.NewGetRecentIssuesTool(
+		cfg.Github.Token,
+		cfg.Github.DefaultLimit,
+		cfg.Github.DefaultDays,
+		"",
+		nil,
+	)
+	pullRequestsTool := githubtool.NewGetPullRequestsTool(
+		cfg.Github.Token,
+		cfg.Github.DefaultLimit,
+		cfg.Github.DefaultDays,
+		"",
+		nil,
+	)
 	toolRegistry.Register(currentTimeTool)
 	toolRegistry.Register(queryMemoryTool)
 	toolRegistry.Register(memorytool.NewGetMemoryDetailTool(memoryService, nil))
 	toolRegistry.Register(memorytool.NewAggregateMemoryTool(memoryService, nil))
 	toolRegistry.Register(recentCommitsTool)
+	toolRegistry.Register(recentIssuesTool)
+	toolRegistry.Register(pullRequestsTool)
 	pipelineAgent := agent.NewAgent(toolRegistry, analysisChatModel, chatPipeline)
 	projectAgent, err := project_pipeline.NewAgent(
 		ctx,
 		project_pipeline.NewProjectResolver(projectService),
 		toolCallingChatModel,
-		[]tools.Tool{currentTimeTool, queryMemoryTool, recentCommitsTool},
+		[]tools.Tool{currentTimeTool, queryMemoryTool, recentCommitsTool, recentIssuesTool, pullRequestsTool},
 	)
 	if err != nil {
 		_ = milvusStore.Close(ctx)

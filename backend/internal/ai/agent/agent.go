@@ -48,11 +48,12 @@ func (a *Agent) Chat(ctx context.Context, input ChatInput) (*ChatOutput, error) 
 		return nil, errors.New("agent runtime is not initialized")
 	}
 	decision := a.dispatch(message)
-	switch input.Pipeline {
+	switch normalizePipelineOverride(input.Pipeline) {
 	case dispatcher.PipelineChat:
 		decision.Pipeline = dispatcher.PipelineChat
 	case dispatcher.PipelineProject:
 		decision.Pipeline = dispatcher.PipelineProject
+		decision.Intent = dispatcher.ProjectIntent(message)
 	}
 	if decision.Pipeline == dispatcher.PipelineProject {
 		if a.projectAgent == nil {
@@ -101,4 +102,15 @@ func (a *Agent) Chat(ctx context.Context, input ChatInput) (*ChatOutput, error) 
 		Pipeline:  decision.Pipeline,
 		UsedTools: usedTools,
 	}, nil
+}
+
+func normalizePipelineOverride(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "chat", dispatcher.PipelineChat:
+		return dispatcher.PipelineChat
+	case "project", dispatcher.PipelineProject:
+		return dispatcher.PipelineProject
+	default:
+		return ""
+	}
 }
