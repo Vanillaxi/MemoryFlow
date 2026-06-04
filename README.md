@@ -1,22 +1,21 @@
 # MemoryFlow
 
-MemoryFlow 是一个面向个人长期记忆管理的 AI 后端服务。它可以接收文字和图片记忆，
-自动生成摘要、标签、情绪和重要度，并将记忆写入向量索引。用户可以通过自然语言回顾
-近期记录、搜索相关记忆，或者总结一段时间内的主要活动。
+MemoryFlow 是一个本地优先的个人长期记忆 Agent。它可以接收文字和图片记忆，
+通过 LLM 自动生成摘要、标签、情绪和重要度，将分析结果写入 SQLite，并将长期记忆
+写入向量索引。用户可以通过自然语言回顾近期记录、搜索相关记忆，或者总结一段时间内
+的主要活动。
 
 项目使用 Go 开发，HTTP 服务基于 Gin，结构化数据存储在 SQLite 中，向量检索使用
-Milvus。对话链路支持工具调用，模型会根据问题查询长期记忆、读取记忆详情并结合时间
-信息组织回答。
+Milvus。Milvus 不可用时，服务会降级到 DisabledStore，HTTP 服务仍可启动。
+
+MemoryFlow 现在也支持 Project Agent 能力，可以结合项目上下文、GitHub commits、
+issues 和 PR，回答项目进展、未处理 issue、最近 PR、下一步建议等问题。
 
 ## 核心能力
 
-- 记录文字记忆和图片记忆。
-- 统一分析 `text`、`image`、`mixed` 三种记忆输入。
-- 自动生成摘要、标签、情绪和重要度。
-- 使用 Embedding 和 Milvus 建立长期记忆索引。
-- 通过自然语言搜索、回顾和总结个人记忆。
-- 提供时间线、近期记录、重建索引等 HTTP API。
-- 支持调试模式查看 chat pipeline 的工具调用 trace。
+- 记录文字记忆和图片记忆，通过自然语言搜索、回顾和总结个人记忆。统一分析 `text`、`image`、`mixed` 三种记忆输入， 并由LLM 自动生成摘要、标签、情绪和重要度。
+- GitHub 只读工具：recent commits、issues、pull requests，Eino ReAct Project Agent，支持项目上下文问答。
+
 
 ## 项目结构
 
@@ -32,6 +31,8 @@ MemoryFlow/
 │   ├── internal/
 │   │   ├── ai/agent/chat_pipeline/     # 对话、工具调用、总结、时间线回答
 │   │   ├── ai/agent/knowledge_pipeline/ # loader -> transformer -> embedding -> indexer
+│   │   ├── ai/agent/project_pipeline/  # Eino ReAct 项目上下文 Agent
+│   │   ├── ai/tools/github/            # GitHub 只读工具
 │   │   ├── ai/workflow/memory_analyze/ # 统一记忆分析 workflow
 │   │   ├── api/                        # HTTP API
 │   │   ├── bootstrap/                  # 服务依赖初始化
@@ -48,6 +49,9 @@ tool-calling 执行策略，不单独提供命令。
 `knowledge_pipeline` 负责记忆和知识的入库索引。文字、图片和图文混合记忆统一通过
 `memory_analyze` workflow 分析。
 
+`project_pipeline` 负责项目上下文问答。它会先解析当前项目，再通过只读 GitHub 工具
+查询 commits、issues 和 pull requests，并在响应中返回工具调用证据。
+
 ## 快速开始
 
 ### 1. 环境要求
@@ -56,10 +60,18 @@ tool-calling 执行策略，不单独提供命令。
 - 可访问的 Milvus 服务，默认地址为 `localhost:19530`
 - 可用的对话模型 API
 - 可用的 Embedding API
+- 可选的 GitHub fine-grained token，用于 Project Agent 查询 commits、issues 和 PR
 
-模型和 Embedding 接口通过 `base_url`、`api_key` 和 `model_name` 配置。
+模型、Embedding 和 GitHub token 都从本地 `configs/config.yaml` 读取。
 
-### 2. 创建本地配置
+### 2. 克隆项目
+
+```bash
+git clone https://github.com/Vanillaxi/MemoryFlow.git
+cd MemoryFlow
+```
+
+### 3. 创建本地配置
 
 进入后端目录，并从模板创建配置文件：
 
@@ -96,17 +108,22 @@ embedding:
 milvus:
   address: "localhost:19530"
   collection: "memoryflow_memories"
+
+github:
+  token: "your github token"
+  default_limit: 10
+  default_days: 7
 ```
 
 SQLite 数据目录会在首次启动时自动创建。Milvus 需要提前启动，并确保
-`embedding.dim` 与实际 Embedding 模型输出维度一致。
+`embedding.dim` 与实际 Embedding 模型输出维度一致。`github.token` 可以为空；为空时，
+Project Agent 的 GitHub 查询会因为缺少 token 返回清晰错误，但不会把 token 暴露给模型。
 
-### 3. 启动服务
+### 4. 启动服务
 
 本地启动正式 HTTP 服务：
 
 ```bash
-cd backend
 go run .
 ```
 
@@ -124,7 +141,62 @@ curl -s "http://localhost:8080/health"
 {"status":"ok"}
 ```
 
-### 4. 写入一条文字记忆
+### 5. 创建项目
+
+Project Agent 需要先通过 Project 表建立项目与 GitHub 仓库的映射：
+
+```bash
+curl -X POST http://localhost:8080/projects \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "MemoryFlow",
+    "description": "本地优先的个人长期记忆 Agent",
+    "repo_owner": "Vanillaxi",
+    "repo_name": "MemoryFlow",
+    "repo_url": "https://github.com/Vanillaxi/MemoryFlow",
+    "tech_stack": "Go, Gin, SQLite, Milvus, Eino",
+    "status": "active"
+  }'
+```
+
+### 6. 调用 Project Agent
+
+查询项目进展：
+
+```bash
+curl -X POST http://localhost:8080/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message":"我的 MemoryFlow 最近做到哪了？","days":7,"limit":5}' | jq
+```
+
+查询未处理 issue：
+
+```bash
+curl -X POST http://localhost:8080/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message":"MemoryFlow 还有哪些 issue 没处理？","days":30,"limit":10}' | jq
+```
+
+查询最近 PR：
+
+```bash
+curl -X POST http://localhost:8080/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message":"MemoryFlow 最近有哪些 PR？","days":30,"limit":10}' | jq
+```
+
+Project Agent 响应会包含 `pipeline`、`intent`、`used_tools`、`evidence` 和
+`raw_tool_calls`，便于确认问题是否路由到正确工具。
+
+也可以显式强制走 Project Agent：
+
+```bash
+curl -X POST http://localhost:8080/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message":"MemoryFlow 最近做到哪了？","pipeline":"project"}' | jq
+```
+
+### 7. 写入一条文字记忆
 
 ```bash
 curl -s -X POST "http://localhost:8080/api/memories/text" \
@@ -139,7 +211,7 @@ curl -s -X POST "http://localhost:8080/api/memories/text" \
 服务会创建记忆和异步分析任务。worker 完成分析后，会继续生成 Embedding 并写入
 Milvus。
 
-### 5. 用自然语言查询记忆
+### 8. 用自然语言查询记忆
 
 ```bash
 curl -s "http://localhost:8080/api/memories/ask?q=最近一周我记录了什么&debug=true"
@@ -154,7 +226,7 @@ curl -s "http://localhost:8080/api/agent/tools"
 调试 trace 中可以看到 `get_current_time`、`query_long_term_memory`、
 `get_memory_detail` 等工具调用。
 
-### 6. 使用 Docker 启动
+### 9. 使用 Docker 启动
 
 构建 backend 镜像：
 
@@ -240,6 +312,55 @@ Docker 容器访问宿主机代理应使用 `host.docker.internal:7897`，不要
 尝试连接宿主机代理，但代理端口没有对 Docker VM 开放。请在 Clash Verge 中启用
 `Allow LAN` 或“允许局域网连接”等价选项，并确认代理监听地址不是仅限 `127.0.0.1`。
 
+## 配置说明
+
+配置文件默认读取 `backend/configs/config.yaml`。仓库只提交
+`backend/configs/config.example.yaml` 作为模板，不要提交真实 token、API key 或本地
+`config.yaml`。
+
+常用配置项：
+
+| 配置 | 用途 |
+| --- | --- |
+| `server.port` | HTTP 服务端口，默认 `8080` |
+| `database.dsn` | SQLite 数据库路径，默认 `../memoryflow-data/data/memoryflow.db` |
+| `storage.upload_dir` | 图片和上传文件目录，默认 `../memoryflow-data/uploads` |
+| `model.base_url` | OpenAI-compatible 对话模型接口地址 |
+| `model.api_key` | 对话模型 API key，本地配置，不要提交 |
+| `model.model_name` | 对话模型名称 |
+| `embedding.base_url` | Embedding 模型接口地址 |
+| `embedding.api_key` | Embedding API key，本地配置，不要提交 |
+| `embedding.model_name` | Embedding 模型名称 |
+| `embedding.dim` | Embedding 维度，必须和模型输出一致 |
+| `milvus.address` | Milvus 地址，本地默认 `localhost:19530` |
+| `milvus.collection` | Milvus collection 名称 |
+| `github.token` | GitHub fine-grained token，只用于只读查询 |
+| `github.default_limit` | GitHub 工具默认返回数量 |
+| `github.default_days` | GitHub commits/issues 默认查询天数 |
+
+GitHub token 建议使用 fine-grained token，并只授予 read-only 权限：
+
+- Contents: Read-only
+- Issues: Read-only
+- Pull requests: Read-only
+- Metadata: Read-only
+
+## 安全设计
+
+- GitHub tools 全部只读，只查询 commits、issues 和 pull requests。
+- 不支持 merge PR、关闭 issue、评论 issue、创建 release 等写操作。
+- GitHub 原始数据不落 SQLite，只作为实时证据源参与当次回答。
+- GitHub token 从本地配置读取，不进入 LLM prompt，不打印到日志。
+- Project Agent prompt 明确禁止修改 GitHub 仓库或泄露 token、API key 等敏感信息。
+
+## 降级设计
+
+- Milvus 可用时，启动 `MilvusStore` 并用于向量检索和向量写入。
+- Milvus 不可用时，启动 `DisabledStore`。
+- `DisabledStore` 会让向量检索和插入返回清晰错误，但不会阻塞 HTTP 服务启动。
+- GitHub Project Agent 不依赖 Milvus。Milvus 挂了，仍然可以基于 SQLite 中的项目映射
+  查询 GitHub commits、issues 和 pull requests。
+
 ## 调试命令
 
 `backend/cmd/` 只保留两个调试入口。
@@ -293,20 +414,12 @@ RUN_INDEX=1 ./scripts/test_memoryflow.sh
 RUN_DOCKER=1 ./scripts/test_memoryflow.sh
 ```
 
-## 常用 API
+## Roadmap
 
-| 方法 | 路径 | 用途 |
-| --- | --- | --- |
-| `GET` | `/health` | 服务健康检查 |
-| `POST` | `/api/memories/text` | 创建文字记忆 |
-| `POST` | `/api/memories/image` | 创建图片记忆 |
-| `GET` | `/api/memories/recent` | 查看近期记忆 |
-| `GET` | `/api/memories/search` | 搜索相关记忆 |
-| `GET` | `/api/memories/summary` | 总结指定时间范围内的记忆 |
-| `GET` | `/api/timeline` | 查看时间线 |
-| `GET` | `/api/memories/ask` | 使用自然语言查询记忆 |
-| `POST` | `/api/memories/:id/reanalyze` | 重新分析指定记忆 |
-| `POST` | `/api/memories/reindex` | 重建记忆索引 |
-| `GET` | `/api/agent/tools` | 查看 chat pipeline 工具列表 |
+- HandoffTool：生成给 ChatGPT / Codex 的项目交接摘要。
+- SaveProjectSummaryToMemory：把项目总结保存为长期记忆。
+- Web / Docs Tool：只读查询官方文档。
+- Milvus docker-compose 整理。
+- 简单前端页面。
 
 更多命令说明见 [docs/cmd_usage.md](docs/cmd_usage.md)。

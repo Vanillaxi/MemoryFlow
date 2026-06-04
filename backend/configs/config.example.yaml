@@ -30,6 +30,6 @@ github:
   # - Issues: Read-only，用于 issues
   # - Pull requests: Read-only，用于 PR
   # - Metadata: Read-only，GitHub 默认需要
-  token: ""
+  token: "your github token"
   default_limit: 10
   default_days: 7
