@@ -14,6 +14,7 @@ import (
 	agentruntime "memoryflow/internal/ai/agent/runtime"
 	memorytools "memoryflow/internal/ai/tools"
 	githubtools "memoryflow/internal/ai/tools/github"
+	memorytool "memoryflow/internal/ai/tools/memory"
 	systemtool "memoryflow/internal/ai/tools/system"
 	"memoryflow/internal/domain/model"
 
@@ -31,6 +32,19 @@ func (fakeAgentTool) Call(context.Context, map[string]any) (string, error) {
 type dynamicAPIProjectAgent struct{}
 
 func (dynamicAPIProjectAgent) Invoke(_ context.Context, input project_pipeline.ProjectAgentInput) (*project_pipeline.ProjectAgentOutput, error) {
+	if input.Intent == "project_handoff" {
+		return &project_pipeline.ProjectAgentOutput{
+			Answer:  "项目交接摘要",
+			Project: model.Project{Name: "MemoryFlow", RepoOwner: "vanillaxi", RepoName: "MemoryFlow"},
+			UsedTools: []string{
+				systemtool.ToolGetCurrentTime,
+				githubtools.ToolGetRecentCommits,
+				githubtools.ToolGetRecentIssues,
+				githubtools.ToolGetPullRequests,
+				memorytool.ToolQueryLongTermMemory,
+			},
+		}, nil
+	}
 	tool := githubtools.ToolGetRecentCommits
 	normalized := strings.ToLower(input.Message)
 	if strings.Contains(normalized, "issue") || strings.Contains(normalized, "未处理") || strings.Contains(normalized, "待处理") {
@@ -91,6 +105,25 @@ func TestAgentChatRoutesProgressQuestionToProjectPipeline(t *testing.T) {
 	output := postAgentChat(t, `{"message":"我的 MemoryFlow 最近做到哪了？"}`)
 	if output.Pipeline != "project_pipeline" || output.Intent != "project_progress" || !containsTool(output.UsedTools, githubtools.ToolGetRecentCommits) {
 		t.Fatalf("unexpected output: %#v", output)
+	}
+}
+
+func TestAgentChatRoutesHandoffQuestionToProjectPipeline(t *testing.T) {
+	output := postAgentChat(t, `{"message":"帮我总结 MemoryFlow 当前进度，方便开启新聊天"}`)
+	if output.Pipeline != "project_pipeline" || output.Intent != "project_handoff" {
+		t.Fatalf("unexpected output: %#v", output)
+	}
+	wantTools := []string{
+		systemtool.ToolGetCurrentTime,
+		githubtools.ToolGetRecentCommits,
+		githubtools.ToolGetRecentIssues,
+		githubtools.ToolGetPullRequests,
+		memorytool.ToolQueryLongTermMemory,
+	}
+	for _, want := range wantTools {
+		if !containsTool(output.UsedTools, want) {
+			t.Fatalf("missing tool %q in %#v", want, output.UsedTools)
+		}
 	}
 }
 

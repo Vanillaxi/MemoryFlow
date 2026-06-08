@@ -19,8 +19,11 @@ func TestDispatch(t *testing.T) {
 		{message: "帮我总结这个页面：https://github.com/cloudwego/eino", intent: IntentExternalKnowledge, pipeline: PipelineKnowledge},
 		{message: "帮我读取这个页面：http://127.0.0.1:8080/health", intent: IntentExternalKnowledge, pipeline: PipelineKnowledge},
 		{message: "MemoryFlow 最近有哪些 release commits？", intent: IntentProjectProgress, pipeline: PipelineProject},
+		{message: "帮我总结 MemoryFlow 当前进度，方便开启新聊天", intent: IntentProjectHandoff, pipeline: PipelineProject},
+		{message: "生成一份 MemoryFlow 的项目交接摘要", intent: IntentProjectHandoff, pipeline: PipelineProject},
+		{message: "总结当前项目状态，给 Codex / ChatGPT 无缝衔接", intent: IntentProjectHandoff, pipeline: PipelineProject},
 		{message: "我之前记录了什么记忆？", intent: IntentMemoryQuery, pipeline: PipelineChat},
-		{message: "帮我整理一份 codex 交接总结", intent: IntentHandoff, pipeline: PipelineProject},
+		{message: "帮我整理一份 codex 交接总结", intent: IntentGeneral, pipeline: PipelineChat},
 		{message: "你好", intent: IntentGeneral, pipeline: PipelineChat},
 	}
 

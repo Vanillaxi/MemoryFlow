@@ -9,6 +9,8 @@ import (
 	agentruntime "memoryflow/internal/ai/agent/runtime"
 	memorytools "memoryflow/internal/ai/tools"
 	githubtools "memoryflow/internal/ai/tools/github"
+	memorytool "memoryflow/internal/ai/tools/memory"
+	systemtool "memoryflow/internal/ai/tools/system"
 	webtools "memoryflow/internal/ai/tools/web"
 	"memoryflow/internal/domain/model"
 )
@@ -54,6 +56,19 @@ type fakeProjectAgent struct {
 
 func (f *fakeProjectAgent) Invoke(_ context.Context, input project_pipeline.ProjectAgentInput) (*project_pipeline.ProjectAgentOutput, error) {
 	f.input = input
+	if input.Intent == "project_handoff" {
+		return &project_pipeline.ProjectAgentOutput{
+			Answer:  "已完成项目交接摘要。",
+			Project: model.Project{Name: "MemoryFlow", RepoOwner: "vanillaxi", RepoName: "MemoryFlow"},
+			UsedTools: []string{
+				systemtool.ToolGetCurrentTime,
+				githubtools.ToolGetRecentCommits,
+				githubtools.ToolGetRecentIssues,
+				githubtools.ToolGetPullRequests,
+				memorytool.ToolQueryLongTermMemory,
+			},
+		}, nil
+	}
 	tool := githubtools.ToolGetRecentCommits
 	normalized := strings.ToLower(input.Message)
 	if strings.Contains(normalized, "issue") || strings.Contains(normalized, "未处理") || strings.Contains(normalized, "待处理") {
@@ -111,6 +126,32 @@ func TestChatProjectPRQuestionUsesProjectAgent(t *testing.T) {
 	}
 	if output.Intent != "project_pr_status" || output.Pipeline != "project_pipeline" || len(output.UsedTools) != 1 || output.UsedTools[0] != githubtools.ToolGetPullRequests {
 		t.Fatalf("unexpected output: %#v", output)
+	}
+}
+
+func TestChatProjectHandoffUsesProjectAgent(t *testing.T) {
+	projectAgent := &fakeProjectAgent{}
+	currentAgent := NewAgent(memorytools.NewToolRegistry(), &fakeSummaryModel{}, nil)
+	currentAgent.SetProjectAgent(projectAgent)
+
+	output, err := currentAgent.Chat(context.Background(), ChatInput{Message: "帮我总结 MemoryFlow 当前进度，方便开启新聊天"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantTools := []string{
+		systemtool.ToolGetCurrentTime,
+		githubtools.ToolGetRecentCommits,
+		githubtools.ToolGetRecentIssues,
+		githubtools.ToolGetPullRequests,
+		memorytool.ToolQueryLongTermMemory,
+	}
+	if output.Intent != "project_handoff" || output.Pipeline != "project_pipeline" {
+		t.Fatalf("unexpected output: %#v", output)
+	}
+	for _, want := range wantTools {
+		if !containsString(output.UsedTools, want) {
+			t.Fatalf("missing tool %q in %#v", want, output.UsedTools)
+		}
 	}
 }
 
@@ -203,4 +244,13 @@ type fakeURLKnowledgePipeline struct{}
 
 func (fakeURLKnowledgePipeline) BuildToolCalls(string, string) []agentruntime.ToolCall {
 	return []agentruntime.ToolCall{{Name: webtools.ToolWebFetch, Args: map[string]any{"url": "https://example.com/docs"}}}
+}
+
+func containsString(items []string, want string) bool {
+	for _, item := range items {
+		if item == want {
+			return true
+		}
+	}
+	return false
 }

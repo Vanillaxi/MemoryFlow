@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"strings"
 
+	"memoryflow/internal/ai/agent/dispatcher"
 	"memoryflow/internal/ai/tools"
+	domainmodel "memoryflow/internal/domain/model"
 
 	"github.com/cloudwego/eino/components/model"
 	einotool "github.com/cloudwego/eino/components/tool"
@@ -64,10 +66,7 @@ func (a *Agent) Invoke(ctx context.Context, input ProjectAgentInput) (*ProjectAg
 		limit:      input.Limit,
 		recorder:   recorder,
 	})
-	userPrompt := fmt.Sprintf(
-		"用户问题：%s\n当前项目：%s\n项目描述：%s\nrepository=%s\ndays=%d\nlimit=%d\n请自主调用工具并基于证据总结。",
-		message, project.Name, project.Description, project.Repository(), input.Days, input.Limit,
-	)
+	userPrompt := buildProjectUserPrompt(message, input.Intent, *project, input.Days, input.Limit)
 	result, err := a.react.Generate(ctx, []*schema.Message{schema.UserMessage(userPrompt)})
 	if err != nil {
 		return nil, fmt.Errorf("project react agent failed: %w", err)
@@ -80,6 +79,52 @@ func (a *Agent) Invoke(ctx context.Context, input ProjectAgentInput) (*ProjectAg
 		Evidence:     toolEvidence(calls),
 		RawToolCalls: calls,
 	}, nil
+}
+
+func buildProjectUserPrompt(message string, intent string, project domainmodel.Project, days int, limit int) string {
+	if intent == "" {
+		intent = dispatcher.ProjectIntent(message)
+	}
+	base := fmt.Sprintf(
+		"用户问题：%s\n识别出的 intent：%s\n当前项目：%s\n项目描述：%s\nrepo_owner=%s\nrepo_name=%s\nrepo_url=%s\nrepository=%s\ntech_stack=%s\nstatus=%s\ndays=%d\nlimit=%d\n",
+		message,
+		intent,
+		project.Name,
+		project.Description,
+		project.RepoOwner,
+		project.RepoName,
+		project.RepoURL,
+		project.Repository(),
+		project.TechStack,
+		project.Status,
+		days,
+		limit,
+	)
+	if intent != dispatcher.IntentProjectHandoff {
+		return base + "请自主调用工具并基于证据总结。"
+	}
+	return base + `这是 Project Handoff Summary 模式。handoff 不是工具，而是 project_pipeline 的输出目标。
+请先收集只读证据，再生成结构化项目交接摘要：
+- 必须调用 get_current_time。
+- 必须调用 get_recent_commits，总结最近 GitHub 进展。
+- 必须调用 get_recent_issues，并优先查询 state=open。
+- 必须调用 get_pull_requests 查询最近 PR。
+- 必须调用 query_long_term_memory，围绕项目名、最近进度、架构决策、已完成、未完成等查询。
+- web_fetch / web_search 不是必调；只有用户提供外部 URL 或明确要求参考官方文档/外部资料时才调用。
+
+最终 answer 必须使用结构化 Markdown，并包含这些章节：
+# Project Handoff Summary: <ProjectName>
+## 1. 项目定位
+## 2. 当前核心能力
+## 3. 最近 GitHub 进展
+## 4. Issues / PR 状态
+## 5. 关键架构决策
+## 6. 当前风险 / 待确认点
+## 7. 下一步建议
+## 8. 给 Codex / ChatGPT 的上下文包
+
+不要新增 HandoffTool，不要创建 TodoTool，不要写 GitHub，不要写文件，不要自动保存到 memory。
+不要编造 commits/issues/PR/memory；如果某类证据没有查到，要明确说明没有查询到。`
 }
 
 func usedToolNames(calls []ToolCallLog) []string {

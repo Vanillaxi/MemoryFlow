@@ -75,7 +75,7 @@ func (a *Agent) Chat(ctx context.Context, input ChatInput) (*ChatOutput, error) 
 			return nil, errors.New("project agent is not initialized")
 		}
 		output, err := a.projectAgent.Invoke(ctx, project_pipeline.ProjectAgentInput{
-			Message: message, ProjectID: input.ProjectID, Days: input.Days, Limit: input.Limit,
+			Message: message, Intent: decision.Intent, ProjectID: input.ProjectID, Days: input.Days, Limit: input.Limit,
 		})
 		if err != nil {
 			return nil, err

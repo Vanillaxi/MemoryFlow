@@ -4,9 +4,9 @@ const (
 	IntentProjectProgress    = "project_progress"
 	IntentProjectIssueStatus = "project_issue_status"
 	IntentProjectPRStatus    = "project_pr_status"
+	IntentProjectHandoff     = "project_handoff"
 	IntentMemoryQuery        = "memory_query"
 	IntentExternalKnowledge  = "external_knowledge"
-	IntentHandoff            = "handoff"
 	IntentGeneral            = "general"
 )
 

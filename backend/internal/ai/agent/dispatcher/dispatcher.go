@@ -10,8 +10,11 @@ type Decision struct {
 func Dispatch(message string) Decision {
 	normalized := strings.ToLower(strings.TrimSpace(message))
 
-	if containsAny(normalized, "开启新聊天", "交接", "handoff", "codex") {
-		return Decision{Intent: IntentHandoff, Pipeline: PipelineProject}
+	if containsWebURL(normalized) && !isLocalProjectQuestion(normalized) {
+		return Decision{Intent: IntentExternalKnowledge, Pipeline: PipelineKnowledge}
+	}
+	if isLocalProjectQuestion(normalized) && isProjectHandoffQuestion(normalized) {
+		return Decision{Intent: IntentProjectHandoff, Pipeline: PipelineProject}
 	}
 	if isLocalProjectQuestion(normalized) && isProjectIssueQuestion(normalized) {
 		return Decision{Intent: IntentProjectIssueStatus, Pipeline: PipelineProject}
@@ -37,6 +40,8 @@ func Dispatch(message string) Decision {
 func ProjectIntent(message string) string {
 	normalized := strings.ToLower(strings.TrimSpace(message))
 	switch {
+	case isProjectHandoffQuestion(normalized):
+		return IntentProjectHandoff
 	case isProjectIssueQuestion(normalized):
 		return IntentProjectIssueStatus
 	case isProjectPRQuestion(normalized):
@@ -56,6 +61,14 @@ func isProjectPRQuestion(message string) bool {
 
 func isProjectProgressQuestion(message string) bool {
 	return containsAny(message, "commit", "commits", "项目进展", "做到哪", "进展", "最近")
+}
+
+func isProjectHandoffQuestion(message string) bool {
+	return containsAny(
+		message,
+		"handoff", "交接", "交接摘要", "无缝衔接", "新聊天", "新对话", "上下文包",
+		"项目上下文", "当前进度总结", "给 codex", "给 chatgpt", "总结当前项目状态",
+	)
 }
 
 func isLocalProjectQuestion(message string) bool {
