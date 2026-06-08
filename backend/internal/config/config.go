@@ -11,6 +11,7 @@ type Config struct {
 	Server    ServerConfig    `mapstructure:"server"`
 	Database  DatabaseConfig  `mapstructure:"database"`
 	Storage   StorageConfig   `mapstructure:"storage"`
+	MCP       MCPConfig       `mapstructure:"mcp"`
 	Model     ModelConfig     `mapstructure:"model"`
 	Embedding EmbeddingConfig `mapstructure:"embedding"`
 	Milvus    MilvusConfig    `mapstructure:"milvus"`
@@ -29,6 +30,10 @@ type DatabaseConfig struct {
 
 type StorageConfig struct {
 	UploadDir string `mapstructure:"upload_dir"`
+}
+
+type MCPConfig struct {
+	Token string `mapstructure:"token"`
 }
 
 type ModelConfig struct {

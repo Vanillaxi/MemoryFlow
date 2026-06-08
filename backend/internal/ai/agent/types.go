@@ -18,6 +18,7 @@ type Pipeline interface {
 
 type ChatInput struct {
 	Message   string `json:"message"`
+	Intent    string `json:"intent,omitempty"`
 	ProjectID *uint  `json:"project_id,omitempty"`
 	Days      int    `json:"days,omitempty"`
 	Limit     int    `json:"limit,omitempty"`

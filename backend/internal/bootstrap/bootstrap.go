@@ -51,6 +51,7 @@ type App struct {
 	ChatPipeline      *chat_pipeline.Pipeline
 	KnowledgePipeline *knowledge_pipeline.Pipeline
 	Agent             *agent.Agent
+	ToolRegistry      *tools.ToolRegistry
 
 	Storage *storage.LocalStorage
 	Worker  *task.Worker
@@ -230,6 +231,7 @@ func NewApp(ctx context.Context) (*App, error) {
 		ChatPipeline:      chatPipeline,
 		KnowledgePipeline: knowledgePipeline,
 		Agent:             pipelineAgent,
+		ToolRegistry:      toolRegistry,
 
 		Storage: localStorage,
 		Worker:  worker,

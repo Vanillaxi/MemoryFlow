@@ -10,6 +10,7 @@ import (
 
 	"memoryflow/internal/api"
 	"memoryflow/internal/bootstrap"
+	"memoryflow/internal/mcp"
 
 	"github.com/gin-gonic/gin"
 )
@@ -36,11 +37,12 @@ func main() {
 	taskHandler := api.NewTaskHandler(app.TaskService)
 	projectHandler := api.NewProjectHandler(app.ProjectService)
 	agentHandler := api.NewAgentHandler(app.Agent)
+	mcpServer := mcp.NewServer(app.Agent, app.ToolRegistry, app.Config.MCP.Token)
 
 	r := gin.Default()
-	api.RegisterRoutes(r, memoryHandler, taskHandler, projectHandler, agentHandler, app.Config.Storage.UploadDir)
+	api.RegisterRoutes(r, memoryHandler, taskHandler, projectHandler, agentHandler, mcpServer, app.Config.Storage.UploadDir)
 	log.Printf("MemoryFlow config loaded from %s", bootstrap.DefaultConfigPath)
-	log.Println("MemoryFlow routes: POST /agent/chat, POST /projects, GET /projects")
+	log.Println("MemoryFlow routes: POST /agent/chat, POST /mcp/rpc, POST /projects, GET /projects")
 
 	addr := fmt.Sprintf(":%d", app.Config.Server.Port)
 	if host := strings.TrimSpace(app.Config.Server.Host); host != "" {
