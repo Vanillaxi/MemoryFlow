@@ -36,9 +36,13 @@ type WebFetchTool struct {
 }
 
 type webFetchOutput struct {
-	Title   string `json:"title"`
-	URL     string `json:"url"`
-	Content string `json:"content"`
+	Title          string `json:"title"`
+	URL            string `json:"url"`
+	Source         string `json:"source"`
+	Domain         string `json:"domain"`
+	FetchedAt      string `json:"fetched_at"`
+	Content        string `json:"content"`
+	ContentPreview string `json:"content_preview"`
 }
 
 func NewWebFetchTool(client *http.Client, resolver IPResolver) *WebFetchTool {
@@ -83,11 +87,18 @@ func (t *WebFetchTool) Call(ctx context.Context, args map[string]any) (string, e
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", ToolWebFetch, err)
 	}
+	finalURL := resp.Request.URL.String()
 	title, content := extractReadableText(body)
+	content = truncateRunes(content, maxFetchContentRunes)
+	domain := strings.ToLower(resp.Request.URL.Hostname())
 	output := webFetchOutput{
-		Title:   title,
-		URL:     resp.Request.URL.String(),
-		Content: truncateRunes(content, maxFetchContentRunes),
+		Title:          title,
+		URL:            finalURL,
+		Source:         domain,
+		Domain:         domain,
+		FetchedAt:      time.Now().UTC().Format(time.RFC3339),
+		Content:        content,
+		ContentPreview: truncateRunes(content, 500),
 	}
 	bytes, err := json.Marshal(output)
 	if err != nil {

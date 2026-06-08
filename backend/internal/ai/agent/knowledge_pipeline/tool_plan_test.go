@@ -14,6 +14,13 @@ func TestBuildToolCallsUsesWebFetchForURL(t *testing.T) {
 	}
 }
 
+func TestBuildToolCallsUsesWebFetchForGitHubURL(t *testing.T) {
+	calls := (&Pipeline{}).BuildToolCalls(dispatcher.IntentExternalKnowledge, "帮我总结这个页面：https://github.com/cloudwego/eino")
+	if len(calls) != 1 || calls[0].Name != webtool.ToolWebFetch || calls[0].Args["url"] != "https://github.com/cloudwego/eino" {
+		t.Fatalf("unexpected calls: %#v", calls)
+	}
+}
+
 func TestBuildToolCallsUsesWebSearchForExternalKnowledge(t *testing.T) {
 	calls := (&Pipeline{}).BuildToolCalls(dispatcher.IntentExternalKnowledge, "搜索 Gin 官方文档")
 	if len(calls) != 1 || calls[0].Name != webtool.ToolWebSearch || calls[0].Args["query"] != "搜索 Gin 官方文档" {

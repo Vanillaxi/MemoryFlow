@@ -50,6 +50,15 @@ func TestWebFetchReadsHTTPSPage(t *testing.T) {
 	if output.Title != "Docs" || output.URL != "https://example.com/docs" {
 		t.Fatalf("unexpected output: %#v", output)
 	}
+	if output.Source != "example.com" || output.Domain != "example.com" {
+		t.Fatalf("unexpected source/domain: %#v", output)
+	}
+	if output.FetchedAt == "" {
+		t.Fatalf("expected fetched_at: %#v", output)
+	}
+	if output.ContentPreview == "" || len([]rune(output.ContentPreview)) > 500 {
+		t.Fatalf("unexpected content_preview: %#v", output)
+	}
 	if !strings.Contains(output.Content, "Hello Readable content.") || strings.Contains(output.Content, "alert") || strings.Contains(output.Content, ".x") {
 		t.Fatalf("unexpected content: %q", output.Content)
 	}

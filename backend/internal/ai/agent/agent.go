@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"memoryflow/internal/ai/agent/reflection_pipeline"
 	agentruntime "memoryflow/internal/ai/agent/runtime"
 	"memoryflow/internal/ai/tools"
+	webtool "memoryflow/internal/ai/tools/web"
 )
 
 type Agent struct {
@@ -54,6 +56,10 @@ func (a *Agent) Chat(ctx context.Context, input ChatInput) (*ChatOutput, error) 
 		return nil, errors.New("agent runtime is not initialized")
 	}
 	decision := a.dispatch(message)
+	if input.ProjectID != nil {
+		decision.Pipeline = dispatcher.PipelineProject
+		decision.Intent = dispatcher.ProjectIntent(message)
+	}
 	switch normalizePipelineOverride(input.Pipeline) {
 	case dispatcher.PipelineChat:
 		decision.Pipeline = dispatcher.PipelineChat
@@ -134,10 +140,38 @@ func runtimeEvidence(logs []agentruntime.ToolCallLog) []project_pipeline.Evidenc
 		detail := log.Result
 		if log.Error != "" {
 			detail = log.Error
+		} else if summarized, ok := webEvidenceDetail(log.Name, log.Result); ok {
+			detail = summarized
 		}
 		evidence = append(evidence, project_pipeline.Evidence{Source: log.Name, Detail: detail})
 	}
 	return evidence
+}
+
+func webEvidenceDetail(name string, result string) (string, bool) {
+	switch name {
+	case webtool.ToolWebFetch:
+		var payload struct {
+			Title          string `json:"title"`
+			URL            string `json:"url"`
+			Source         string `json:"source"`
+			Domain         string `json:"domain"`
+			FetchedAt      string `json:"fetched_at"`
+			ContentPreview string `json:"content_preview"`
+		}
+		if err := json.Unmarshal([]byte(result), &payload); err != nil {
+			return "", false
+		}
+		bytes, err := json.Marshal(payload)
+		if err != nil {
+			return "", false
+		}
+		return string(bytes), true
+	case webtool.ToolWebSearch:
+		return result, true
+	default:
+		return "", false
+	}
 }
 
 func runtimeToolCalls(logs []agentruntime.ToolCallLog) []project_pipeline.ToolCallLog {

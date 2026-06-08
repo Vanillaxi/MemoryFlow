@@ -10,17 +10,20 @@ type Decision struct {
 func Dispatch(message string) Decision {
 	normalized := strings.ToLower(strings.TrimSpace(message))
 
-	if containsAny(normalized, "总结", "开启新聊天", "交接", "handoff", "codex") {
+	if containsAny(normalized, "开启新聊天", "交接", "handoff", "codex") {
 		return Decision{Intent: IntentHandoff, Pipeline: PipelineProject}
 	}
-	if isProjectGitHubQuestion(normalized) && isProjectIssueQuestion(normalized) {
+	if isLocalProjectQuestion(normalized) && isProjectIssueQuestion(normalized) {
 		return Decision{Intent: IntentProjectIssueStatus, Pipeline: PipelineProject}
 	}
-	if isProjectGitHubQuestion(normalized) && isProjectPRQuestion(normalized) {
+	if isLocalProjectQuestion(normalized) && isProjectPRQuestion(normalized) {
 		return Decision{Intent: IntentProjectPRStatus, Pipeline: PipelineProject}
 	}
-	if isProjectGitHubQuestion(normalized) && (isProjectProgressQuestion(normalized) || containsAny(normalized, "github", "仓库", "changelog", "release")) {
+	if isLocalProjectQuestion(normalized) && isProjectProgressQuestion(normalized) {
 		return Decision{Intent: IntentProjectProgress, Pipeline: PipelineProject}
+	}
+	if containsWebURL(normalized) {
+		return Decision{Intent: IntentExternalKnowledge, Pipeline: PipelineKnowledge}
 	}
 	if isExternalKnowledgeQuestion(normalized) {
 		return Decision{Intent: IntentExternalKnowledge, Pipeline: PipelineKnowledge}
@@ -55,8 +58,8 @@ func isProjectProgressQuestion(message string) bool {
 	return containsAny(message, "commit", "commits", "项目进展", "做到哪", "进展", "最近")
 }
 
-func isProjectGitHubQuestion(message string) bool {
-	return containsAny(message, "memoryflow", "github", "仓库", "repo", "repository", "项目")
+func isLocalProjectQuestion(message string) bool {
+	return containsAny(message, "memoryflow", "本地项目", "当前项目", "项目")
 }
 
 func isExternalKnowledgeQuestion(message string) bool {
@@ -65,6 +68,10 @@ func isExternalKnowledgeQuestion(message string) bool {
 		"官方文档", "最新", "查一下", "搜索", "web", "browser", "资料", "文档",
 		"报错", "怎么用", "api", "version", "release",
 	)
+}
+
+func containsWebURL(message string) bool {
+	return strings.Contains(message, "http://") || strings.Contains(message, "https://")
 }
 
 func containsAny(message string, keywords ...string) bool {
