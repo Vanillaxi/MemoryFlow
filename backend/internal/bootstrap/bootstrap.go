@@ -17,6 +17,7 @@ import (
 	githubtool "memoryflow/internal/ai/tools/github"
 	memorytool "memoryflow/internal/ai/tools/memory"
 	systemtool "memoryflow/internal/ai/tools/system"
+	webtool "memoryflow/internal/ai/tools/web"
 	"memoryflow/internal/ai/vectorstore"
 	"memoryflow/internal/ai/workflow/memory_analyze"
 	"memoryflow/internal/config"
@@ -169,6 +170,8 @@ func NewApp(ctx context.Context) (*App, error) {
 		"",
 		nil,
 	)
+	webSearchTool := webtool.NewWebSearchTool(nil)
+	webFetchTool := webtool.NewWebFetchTool(nil, nil)
 	toolRegistry.Register(currentTimeTool)
 	toolRegistry.Register(queryMemoryTool)
 	toolRegistry.Register(memorytool.NewGetMemoryDetailTool(memoryService, nil))
@@ -176,7 +179,10 @@ func NewApp(ctx context.Context) (*App, error) {
 	toolRegistry.Register(recentCommitsTool)
 	toolRegistry.Register(recentIssuesTool)
 	toolRegistry.Register(pullRequestsTool)
+	toolRegistry.Register(webSearchTool)
+	toolRegistry.Register(webFetchTool)
 	pipelineAgent := agent.NewAgent(toolRegistry, analysisChatModel, chatPipeline)
+	pipelineAgent.SetKnowledgePipeline(knowledgePipeline)
 	projectAgent, err := project_pipeline.NewAgent(
 		ctx,
 		project_pipeline.NewProjectResolver(projectService),

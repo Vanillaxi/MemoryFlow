@@ -39,6 +39,12 @@ func (a *Agent) SetProjectAgent(projectAgent ProjectAgent) {
 	a.projectAgent = projectAgent
 }
 
+func (a *Agent) SetKnowledgePipeline(knowledgePipeline Pipeline) {
+	if a != nil && knowledgePipeline != nil {
+		a.pipelines[dispatcher.PipelineKnowledge] = knowledgePipeline
+	}
+}
+
 func (a *Agent) Chat(ctx context.Context, input ChatInput) (*ChatOutput, error) {
 	message := strings.TrimSpace(input.Message)
 	if message == "" {
@@ -51,6 +57,9 @@ func (a *Agent) Chat(ctx context.Context, input ChatInput) (*ChatOutput, error) 
 	switch normalizePipelineOverride(input.Pipeline) {
 	case dispatcher.PipelineChat:
 		decision.Pipeline = dispatcher.PipelineChat
+	case dispatcher.PipelineKnowledge:
+		decision.Pipeline = dispatcher.PipelineKnowledge
+		decision.Intent = dispatcher.IntentExternalKnowledge
 	case dispatcher.PipelineProject:
 		decision.Pipeline = dispatcher.PipelineProject
 		decision.Intent = dispatcher.ProjectIntent(message)
@@ -97,10 +106,12 @@ func (a *Agent) Chat(ctx context.Context, input ChatInput) (*ChatOutput, error) 
 	}
 
 	return &ChatOutput{
-		Answer:    strings.TrimSpace(answer),
-		Intent:    decision.Intent,
-		Pipeline:  decision.Pipeline,
-		UsedTools: usedTools,
+		Answer:       strings.TrimSpace(answer),
+		Intent:       decision.Intent,
+		Pipeline:     decision.Pipeline,
+		UsedTools:    usedTools,
+		Evidence:     runtimeEvidence(logs),
+		RawToolCalls: runtimeToolCalls(logs),
 	}, nil
 }
 
@@ -108,9 +119,31 @@ func normalizePipelineOverride(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "chat", dispatcher.PipelineChat:
 		return dispatcher.PipelineChat
+	case "knowledge", dispatcher.PipelineKnowledge:
+		return dispatcher.PipelineKnowledge
 	case "project", dispatcher.PipelineProject:
 		return dispatcher.PipelineProject
 	default:
 		return ""
 	}
+}
+
+func runtimeEvidence(logs []agentruntime.ToolCallLog) []project_pipeline.Evidence {
+	evidence := make([]project_pipeline.Evidence, 0, len(logs))
+	for _, log := range logs {
+		detail := log.Result
+		if log.Error != "" {
+			detail = log.Error
+		}
+		evidence = append(evidence, project_pipeline.Evidence{Source: log.Name, Detail: detail})
+	}
+	return evidence
+}
+
+func runtimeToolCalls(logs []agentruntime.ToolCallLog) []project_pipeline.ToolCallLog {
+	calls := make([]project_pipeline.ToolCallLog, 0, len(logs))
+	for _, log := range logs {
+		calls = append(calls, project_pipeline.ToolCallLog{Name: log.Name, Result: log.Result, Error: log.Error})
+	}
+	return calls
 }

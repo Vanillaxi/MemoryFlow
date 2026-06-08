@@ -6,8 +6,10 @@ import (
 	"testing"
 
 	"memoryflow/internal/ai/agent/project_pipeline"
+	agentruntime "memoryflow/internal/ai/agent/runtime"
 	memorytools "memoryflow/internal/ai/tools"
 	githubtools "memoryflow/internal/ai/tools/github"
+	webtools "memoryflow/internal/ai/tools/web"
 	"memoryflow/internal/domain/model"
 )
 
@@ -107,4 +109,31 @@ func TestChatExplicitProjectPipelineOverride(t *testing.T) {
 	if output.Pipeline != "project_pipeline" || output.Intent != "project_progress" {
 		t.Fatalf("unexpected output: %#v", output)
 	}
+}
+
+func TestChatExternalKnowledgeUsesKnowledgePipeline(t *testing.T) {
+	registry := memorytools.NewToolRegistry()
+	registry.Register(fakeTool{name: webtools.ToolWebSearch, result: `{"query":"Gin 官方文档","results":[{"title":"Gin Docs","url":"https://gin-gonic.com/docs/","snippet":"docs","source":"official"}]}`})
+	currentAgent := NewAgent(registry, &fakeSummaryModel{}, nil)
+	currentAgent.SetKnowledgePipeline(fakeKnowledgePipeline{})
+
+	output, err := currentAgent.Chat(context.Background(), ChatInput{Message: "帮我查一下 Gin 官方文档怎么用 middleware"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if output.Intent != "external_knowledge" || output.Pipeline != "knowledge_pipeline" || len(output.UsedTools) != 1 || output.UsedTools[0] != webtools.ToolWebSearch {
+		t.Fatalf("unexpected output: %#v", output)
+	}
+	if len(output.Evidence) != 1 || !strings.Contains(output.Evidence[0].Detail, "https://gin-gonic.com/docs/") {
+		t.Fatalf("unexpected evidence: %#v", output.Evidence)
+	}
+	if len(output.RawToolCalls) != 1 || output.RawToolCalls[0].Name != webtools.ToolWebSearch {
+		t.Fatalf("unexpected raw tool calls: %#v", output.RawToolCalls)
+	}
+}
+
+type fakeKnowledgePipeline struct{}
+
+func (fakeKnowledgePipeline) BuildToolCalls(string, string) []agentruntime.ToolCall {
+	return []agentruntime.ToolCall{{Name: webtools.ToolWebSearch, Args: map[string]any{"query": "Gin 官方文档", "limit": 5}}}
 }

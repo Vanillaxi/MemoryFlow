@@ -13,14 +13,17 @@ func Dispatch(message string) Decision {
 	if containsAny(normalized, "总结", "开启新聊天", "交接", "handoff", "codex") {
 		return Decision{Intent: IntentHandoff, Pipeline: PipelineProject}
 	}
-	if isProjectIssueQuestion(normalized) {
+	if isProjectGitHubQuestion(normalized) && isProjectIssueQuestion(normalized) {
 		return Decision{Intent: IntentProjectIssueStatus, Pipeline: PipelineProject}
 	}
-	if isProjectPRQuestion(normalized) {
+	if isProjectGitHubQuestion(normalized) && isProjectPRQuestion(normalized) {
 		return Decision{Intent: IntentProjectPRStatus, Pipeline: PipelineProject}
 	}
-	if isProjectProgressQuestion(normalized) || containsAny(normalized, "github", "仓库", "changelog", "release") {
+	if isProjectGitHubQuestion(normalized) && (isProjectProgressQuestion(normalized) || containsAny(normalized, "github", "仓库", "changelog", "release")) {
 		return Decision{Intent: IntentProjectProgress, Pipeline: PipelineProject}
+	}
+	if isExternalKnowledgeQuestion(normalized) {
+		return Decision{Intent: IntentExternalKnowledge, Pipeline: PipelineKnowledge}
 	}
 	if containsAny(normalized, "记忆", "我之前", "最近干了啥") {
 		return Decision{Intent: IntentMemoryQuery, Pipeline: PipelineChat}
@@ -50,6 +53,18 @@ func isProjectPRQuestion(message string) bool {
 
 func isProjectProgressQuestion(message string) bool {
 	return containsAny(message, "commit", "commits", "项目进展", "做到哪", "进展", "最近")
+}
+
+func isProjectGitHubQuestion(message string) bool {
+	return containsAny(message, "memoryflow", "github", "仓库", "repo", "repository", "项目")
+}
+
+func isExternalKnowledgeQuestion(message string) bool {
+	return containsAny(
+		message,
+		"官方文档", "最新", "查一下", "搜索", "web", "browser", "资料", "文档",
+		"报错", "怎么用", "api", "version", "release",
+	)
 }
 
 func containsAny(message string, keywords ...string) bool {

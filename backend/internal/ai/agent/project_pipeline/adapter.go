@@ -11,6 +11,7 @@ import (
 	githubtool "memoryflow/internal/ai/tools/github"
 	memorytool "memoryflow/internal/ai/tools/memory"
 	systemtool "memoryflow/internal/ai/tools/system"
+	webtool "memoryflow/internal/ai/tools/web"
 
 	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
@@ -164,6 +165,15 @@ func parametersFor(name string) map[string]*schema.ParameterInfo {
 		}
 	case systemtool.ToolGetCurrentTime:
 		return nil
+	case webtool.ToolWebSearch:
+		return map[string]*schema.ParameterInfo{
+			"query": {Type: schema.String, Desc: "搜索查询。", Required: true},
+			"limit": {Type: schema.Integer, Desc: "返回数量，可选，默认 5，最大 10。"},
+		}
+	case webtool.ToolWebFetch:
+		return map[string]*schema.ParameterInfo{
+			"url": {Type: schema.String, Desc: "要读取的 http/https 公网 URL。", Required: true},
+		}
 	default:
 		return nil
 	}

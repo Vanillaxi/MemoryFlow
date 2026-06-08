@@ -10,11 +10,13 @@ Milvus。Milvus 不可用时，服务会降级到 DisabledStore，HTTP 服务仍
 
 MemoryFlow 现在也支持 Project Agent 能力，可以结合项目上下文、GitHub commits、
 issues 和 PR，回答项目进展、未处理 issue、最近 PR、下一步建议等问题。
+同时新增了只读 Web Tool MVP，用于在外部公开网页中补充资料和文档信息。
 
 ## 核心能力
 
 - 记录文字记忆和图片记忆，通过自然语言搜索、回顾和总结个人记忆。统一分析 `text`、`image`、`mixed` 三种记忆输入， 并由LLM 自动生成摘要、标签、情绪和重要度。
 - GitHub 只读工具：recent commits、issues、pull requests，Eino ReAct Project Agent，支持项目上下文问答。
+- Web / External Knowledge 只读工具：`web_search` 和 `web_fetch`，用于搜索公开资料和读取公开网页。当前不会登录、点击、提交表单或写入网页，也不会向工具注入 GitHub token、LLM API key 等敏感信息。
 
 
 ## 项目结构
@@ -33,6 +35,7 @@ MemoryFlow/
 │   │   ├── ai/agent/knowledge_pipeline/ # loader -> transformer -> embedding -> indexer
 │   │   ├── ai/agent/project_pipeline/  # Eino ReAct 项目上下文 Agent
 │   │   ├── ai/tools/github/            # GitHub 只读工具
+│   │   ├── ai/tools/web/               # Web 只读搜索和网页读取工具
 │   │   ├── ai/workflow/memory_analyze/ # 统一记忆分析 workflow
 │   │   ├── api/                        # HTTP API
 │   │   ├── bootstrap/                  # 服务依赖初始化
@@ -47,10 +50,18 @@ MemoryFlow/
 tool-calling 执行策略，不单独提供命令。
 
 `knowledge_pipeline` 负责记忆和知识的入库索引。文字、图片和图文混合记忆统一通过
-`memory_analyze` workflow 分析。
+`memory_analyze` workflow 分析。用户询问官方文档、最新资料、API、version、
+release 或“查一下/搜索/怎么用”等外部信息时，也会通过只读 Web Tool MVP 补充公开
+网页信息。
 
 `project_pipeline` 负责项目上下文问答。它会先解析当前项目，再通过只读 GitHub 工具
 查询 commits、issues 和 pull requests，并在响应中返回工具调用证据。
+
+Web Tool / External Knowledge 目前只包含只读能力：
+
+- `web_search`：搜索公开资料，第一版采用 provider 接口占位；未配置真实搜索 provider 时会返回 `ErrWebSearchProviderNotConfigured`。
+- `web_fetch`：读取 `http` / `https` 公网 URL，拒绝 `file://`、localhost、回环地址和内网 IP，限制超时、响应正文大小和最终 content 长度。
+- 不登录、不点击、不提交表单、不写网页，只用于补充外部公开信息。
 
 ## 快速开始
 
@@ -187,6 +198,22 @@ curl -X POST http://localhost:8080/agent/chat \
 
 Project Agent 响应会包含 `pipeline`、`intent`、`used_tools`、`evidence` 和
 `raw_tool_calls`，便于确认问题是否路由到正确工具。
+
+查询官方文档或外部资料：
+
+```bash
+curl -X POST http://localhost:8080/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message":"帮我查一下 Gin 官方文档怎么用 middleware"}' | jq
+```
+
+如果问题中包含公开 URL，会优先使用 `web_fetch`：
+
+```bash
+curl -X POST http://localhost:8080/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message":"读取一下 https://example.com 这页资料"}' | jq
+```
 
 也可以显式强制走 Project Agent：
 
